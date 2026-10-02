@@ -13,6 +13,10 @@ const YouTube = require('../providers/YouTube');
 const SoundCloud = require('../providers/SoundCloud');
 const DirectLink = require('../providers/DirectLink');
 const Tidal = require('../providers/Tidal');
+const ExternalSources = require('../providers/ExternalSources');
+const FloweryTTS = require('../providers/FloweryTTS');
+const SpeechTTS = require('../providers/SpeechTTS');
+const StreamDeckAudio = require('../providers/StreamDeckAudio');
 const LanguageManager = require('./LanguageManager');
 const ErrorHandler = require('../utils/ErrorHandler');
 const PlayerStateManager = require('./PlayerStateManager');
@@ -524,8 +528,8 @@ class MusicPlayer {
                 }
             }
 
-            // For YouTube, Spotify (via YouTube), SoundCloud (via YouTube) - use youtube-dl-exec
-            if (track.platform === 'youtube' || track.platform === 'spotify' || track.platform === 'soundcloud') {
+            // yt-dlp extracts YouTube, Spotify mirrors, SoundCloud, and the additional external sources.
+            if (track.platform === 'youtube' || track.platform === 'spotify' || track.platform === 'soundcloud' || track.platform === 'external') {
                 const youtubedl = require('youtube-dl-exec');
 
                 await youtubedl(downloadUrl, YouTube.getYtDlpOptions({
@@ -539,24 +543,24 @@ class MusicPlayer {
                     audioFormat: 'opus'
                 }));
             } else {
-                // For DirectLink - fetch and transcode with FFmpeg
-                const fetch = await ensureFetch();
-                const response = await fetch(streamUrl, {
-                    headers: streamInfo?.httpHeaders || {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                // For direct and decoded streams, transcode with FFmpeg.
+                let audioStream = streamUrl && typeof streamUrl.pipe === 'function' ? streamUrl : null;
+                if (!audioStream) {
+                    const fetch = await ensureFetch();
+                    const response = await fetch(streamUrl, {
+                        headers: streamInfo?.httpHeaders || {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        this.downloadingFiles.delete(filepath);
+                        throw new Error(`Failed to fetch: ${response.status}`);
                     }
-                });
 
-                if (!response.ok) {
-                    this.downloadingFiles.delete(filepath);
-                    throw new Error(`Failed to fetch: ${response.status}`);
-                }
-
-                let audioStream;
-                if (typeof response.body?.getReader === 'function' && typeof Readable.fromWeb === 'function') {
-                    audioStream = Readable.fromWeb(response.body);
-                } else {
-                    audioStream = response.body;
+                    audioStream = typeof response.body?.getReader === 'function' && typeof Readable.fromWeb === 'function'
+                        ? Readable.fromWeb(response.body)
+                        : response.body;
                 }
 
                 // Transcode to opus
@@ -728,12 +732,28 @@ class MusicPlayer {
                         streamInfo = await SoundCloud.getStream(streamUrl, this.guild.id, resumeFromSeconds);
                         break;
 
+                    case 'external':
+                        streamInfo = await ExternalSources.getStream(streamUrl);
+                        break;
+
                     case 'direct':
                         streamInfo = await DirectLink.getStream(streamUrl, resumeFromSeconds);
                         break;
 
                     case 'tidal':
                         streamInfo = Tidal.getStream(this.currentTrack);
+                        break;
+
+                    case 'flowerytts':
+                        streamInfo = await FloweryTTS.getStream(this.currentTrack);
+                        break;
+
+                    case 'speechtts':
+                        streamInfo = await SpeechTTS.getStream(this.currentTrack);
+                        break;
+
+                    case 'streamdeck':
+                        streamInfo = await StreamDeckAudio.getStream(streamUrl);
                         break;
 
                     default:
@@ -821,7 +841,7 @@ class MusicPlayer {
                     try {
                         const response = await fetch(streamUrl_final, {
                             headers: streamInfo?.httpHeaders || {
-                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36'
                             }
                         });
 
@@ -1719,12 +1739,23 @@ class MusicPlayer {
                     // Only preload tracks with a direct stream; HLS-only tracks are piped through yt-dlp at play time
                     streamInfo = await SoundCloud.getStream(streamUrl, this.guild.id, 0, { allowPipe: false });
                     break;
+                case 'external':
+                    // Do not preload sources which require yt-dlp to pipe an HLS/DASH stream.
+                    streamInfo = await ExternalSources.getStream(streamUrl, { allowPipe: false });
+                    break;
                 case 'direct':
                     streamInfo = await DirectLink.getStream(streamUrl);
                     break;
                 case 'tidal':
                     streamInfo = Tidal.getStream(track);
                     break;
+                case 'flowerytts':
+                    streamInfo = await FloweryTTS.getStream(track);
+                    break;
+                case 'speechtts':
+                    streamInfo = await SpeechTTS.getStream(track);
+                    break;
+                // Stream Deck streams are deliberately not preloaded: the decoded stream is single-use.
             }
 
             if (streamInfo) {

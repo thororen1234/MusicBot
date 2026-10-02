@@ -1,6 +1,13 @@
 // Load environment variables from .env.
 require('dotenv').config();
 
+const disabledProviders = new Set(
+    (process.env.DISABLED_PROVIDERS || '')
+        .split(',')
+        .map(provider => provider.trim().toLowerCase())
+        .filter(Boolean)
+);
+
 module.exports = {
     // Discord Bot Settings
     discord: {
@@ -20,6 +27,41 @@ module.exports = {
         url: (process.env.TIDAL_SUBSONIC_URL || '').replace(/\/+$/, ''),
         username: process.env.TIDAL_SUBSONIC_USER || '',
         password: process.env.TIDAL_SUBSONIC_PASSWORD || '',
+    },
+
+    // Flowery TTS (https://flowery.pw/docs) used with /play ftts://Your text
+    floweryTts: {
+        apiUrl: (process.env.FLOWERY_TTS_API_URL || 'https://api.flowery.pw/v1/tts').replace(/\/+$/, ''),
+        voice: process.env.FLOWERY_TTS_VOICE || '',
+        translate: process.env.FLOWERY_TTS_TRANSLATE === 'true',
+        silence: Math.max(0, Math.min(10000, Number.parseInt(process.env.FLOWERY_TTS_SILENCE || '0', 10) || 0)),
+        speed: Math.max(0.5, Math.min(10, Number.parseFloat(process.env.FLOWERY_TTS_SPEED || '1') || 1)),
+        audioFormat: process.env.FLOWERY_TTS_AUDIO_FORMAT || 'mp3',
+    },
+
+    // Google Translate TTS used with /play speak:Your text
+    speechTts: {
+        language: process.env.GOOGLE_TTS_LANGUAGE || 'en-AU',
+    },
+
+    // Disable one or more providers with DISABLED_PROVIDERS, e.g. tiktok,reddit,pornhub.
+    providers: {
+        disabled: disabledProviders,
+        isEnabled(provider) {
+            return !this.disabled.has(String(provider || '').trim().toLowerCase());
+        },
+        displayName(provider) {
+            const names = {
+                applemusic: 'Apple Music', clypit: 'Clyp.it', flowerytts: 'Flowery TTS',
+                getyarn: 'getyarn', jiosaavn: 'JioSaavn', ocremix: 'OC Remix',
+                pornhub: 'Pornhub', qobuz: 'Qobuz', soundgasm: 'Soundgasm',
+                soundcloud: 'SoundCloud', speechtts: 'Google TTS',
+                streamdeck: 'Stream Deck audio', tiktok: 'TikTok', vk: 'VK Music',
+                yandex: 'Yandex Music',
+            };
+            const normalized = String(provider || '').trim().toLowerCase();
+            return names[normalized] || normalized.replace(/\b\w/g, letter => letter.toUpperCase());
+        },
     },
 
     // Spotify API Settings (optional fallback for Spotify playlists/artists)
@@ -66,7 +108,7 @@ module.exports = {
     ytdl: {
         requestOptions: {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36'
             }
         },
         format: 'bestaudio[ext=webm+acodec=opus+asr=48000]/bestaudio',

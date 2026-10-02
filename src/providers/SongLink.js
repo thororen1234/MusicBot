@@ -21,8 +21,22 @@ const SUPPORTED_HOSTS = [
  * into YouTube tracks using the self-hosted SongLink API (Odesli-compatible).
  */
 class SongLink {
+    static getProviderId(query) {
+        if (/^spotify:[a-z]+:/i.test(query)) return 'spotify';
+        try {
+            const hostname = new URL(query).hostname.toLowerCase();
+            if (/^(open|play)\.spotify\.com$|^spotify(\.app)?\.link$/.test(hostname)) return 'spotify';
+            if (/^(geo\.)?(music|itunes)\.apple\.com$|^apple\.co$/.test(hostname)) return 'applemusic';
+            if (/(^|\.)deezer\.com$|^(deezer|dzr)\.page\.link$/.test(hostname)) return 'deezer';
+            if (/(^|\.)tidal\.com$|^tidal\.link$/.test(hostname)) return 'tidal';
+        } catch {
+            return null;
+        }
+        return null;
+    }
+
     static isSupportedURL(query) {
-        if (/^spotify:[a-z]+:/.test(query)) return true;
+        if (this.getProviderId(query)) return true;
 
         try {
             const { hostname } = new URL(query);
@@ -62,6 +76,12 @@ class SongLink {
      * @returns {Promise<{tracks: object[], isPlaylist: boolean}>}
      */
     static async getTracks(url, guildId = null, source = 'youtube') {
+        const provider = this.getProviderId(url);
+        if (provider && !config.providers.isEnabled(provider)) {
+            const error = new Error(`[SongLink] ${provider} is disabled`);
+            error.reason = 'provider_disabled';
+            throw error;
+        }
         const data = await this.getLinks(url);
         const entity = data.entitiesByUniqueId?.[data.entityUniqueId] || {};
         const links = data.linksByPlatform || {};
@@ -82,6 +102,12 @@ class SongLink {
             const albumError = new Error('[SongLink] albums have no YouTube match');
             albumError.reason = 'album_unsupported';
             throw albumError;
+        }
+
+        if (!config.providers.isEnabled('youtube')) {
+            const error = new Error('[SongLink] YouTube fallback is disabled');
+            error.reason = 'provider_disabled';
+            throw error;
         }
 
         let ytTrack = youtubeUrl ? await YouTube.getInfo(youtubeUrl, guildId) : null;

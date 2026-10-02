@@ -2,7 +2,7 @@
 
 # Beatra v16.0 🎶
 
-## WE DO NOT PROVIDE ANY SUPPORT FOR THIS OPEN-SOURCE PROJECT, WHETHER IT INVOLVES SOFTWARE ISSUES OR BUG-RELATED PROBLEMS. PLEASE DO NOT CONTACT US FOR ASSISTANCE WITH ANY ISSUES OR ERRORS YOU ENCOUNTER IN THIS PROJECT!
+## WE DO NOT PROVIDE ANY SUPPORT FOR THIS OPEN-SOURCE PROJECT, WHETHER IT INVOLVES SOFTWARE ISSUES OR BUG-RELATED PROBLEMS. PLEASE DO NOT CONTACT US FOR ASSISTANCE WITH ANY ISSUES OR ERRORS YOU ENCOUNTER IN THIS PROJECT
 
 ![GitHub Stars](https://img.shields.io/github/stars/umutxyp/musicbot?style=social)
 ![GitHub Forks](https://img.shields.io/github/forks/umutxyp/musicbot?style=social)
@@ -12,6 +12,7 @@
 [Invite the public Beatra bot](https://discord.com/oauth2/authorize?client_id=774043716797071371&permissions=277028620608&scope=applications.commands%20bot) • [Beatra Web Dashboard](https://beatra.app) • [Codeshare](https://codeshare.me)
 
 ## Project Highlights
+
 | Capability | Details |
 | --- | --- |
 | 🎛️ Dynamic Embeds | Auto-refreshing "Now Playing" cards with cover art, platform badges, queue countdowns, and localized metadata. |
@@ -31,7 +32,7 @@
 ## ✨ Why Beatra?
 
 - **Slash-first UX** – `/play`, `/search`, `/queue`, `/language`, `/nowplaying`, and `/help` respond instantly with localized embeds and live-updating buttons.
-- **Platform polyglot** – Plays YouTube, SoundCloud (tracks, playlists and profiles), direct MP3/WAV/OGG links and (optionally) Tidal. Spotify, Apple Music, Deezer and Tidal links are converted through the SongLink API and play from YouTube—or from Tidal when you pick `source:Tidal`. Searches can use `source:SoundCloud` too.
+- **Platform polyglot** – Plays YouTube, SoundCloud (tracks, playlists and profiles), Yandex Music, VK Music, Qobuz, JioSaavn, Flowery TTS, and direct audio links. Spotify, Apple Music, Deezer and Tidal links are converted through the SongLink API and play from YouTube—or from Tidal when you pick `source:Tidal`. Searches can use `source:SoundCloud` too.
 - **Adaptive UI** – A two-row control deck (Pause, Skip, Stop, Queue, Shuffle, Volume) stays in sync with the audio engine and locks down expired sessions automatically.
 - **Edge-ready audio core** – Preloads entire queues, heals voice reconnections, and falls back gracefully when Discord or upstream services hiccup.
 - **Global voice** – 21 fully translated language packs shipped out-of-the-box with instant server switching.
@@ -156,6 +157,7 @@ SUPPORT_SERVER=https://discord.gg/ACJQzJuckW
 WEBSITE=https://beatra.app
 COOKIES_FROM_BROWSER=chrome
 COOKIES_FILE=./cookies.txt
+FLOWERY_TTS_VOICE=optional_flowery_voice
 ```
 
 ### Key Settings
@@ -174,8 +176,19 @@ COOKIES_FILE=./cookies.txt
 | `spotify.clientId` & `spotify.clientSecret` | `.env`/`src/config.js` | Optional fallback for Spotify playlist, album and artist links, which SongLink can't convert to YouTube. |
 | `genius.clientId` & `genius.clientSecret` | `.env`/`src/config.js` | Optional Genius API credentials for higher rate limits (works without via web scraping). |
 | `ytdl.cookiesFromBrowser` & `ytdl.cookiesFile` | `.env`/`src/config.js` | It is an optional feature to add cookies against YouTube cookie errors. |
+| `providers.disabled` | `.env` (`DISABLED_PROVIDERS`) | Comma-separated source IDs to disable before lookup or playback, e.g. `tiktok,reddit,pornhub`. |
 
 > 🔐 Never commit `.env` to source control. Use deployment secrets in your hosting provider or create environment variables at runtime.
+
+### Disabling providers
+
+Set `DISABLED_PROVIDERS` to a comma-separated list and restart the bot. Disabled providers are rejected before they are resolved or played; a disabled YouTube provider also disables SongLink’s YouTube fallback.
+
+```dotenv
+DISABLED_PROVIDERS=tiktok,reddit,pornhub,flowerytts
+```
+
+Available IDs: `youtube`, `soundcloud`, `tidal`, `spotify`, `applemusic`, `deezer`, `yandex`, `vk`, `qobuz`, `jiosaavn`, `mixcloud`, `ocremix`, `clypit`, `reddit`, `getyarn`, `tiktok`, `soundgasm`, `pixeldrain`, `tumblr`, `pornhub`, `flowerytts`, `speechtts`, `streamdeck`, and `direct`.
 
 ---
 
@@ -186,6 +199,7 @@ Beatra can play straight from Tidal through a [TidalSubsonic](https://github.com
 1. Run a TidalSubsonic server and link your Tidal account to it.
 2. Create a Subsonic user on that server for the bot.
 3. Add the server and that user to your `.env`:
+
    ```dotenv
    TIDAL_SUBSONIC_URL=https://your-tidalsubsonic-server
    TIDAL_SUBSONIC_USER=subsonic_user
@@ -193,6 +207,7 @@ Beatra can play straight from Tidal through a [TidalSubsonic](https://github.com
    # Optional: make Tidal the default source for /play and /search (blank = youtube)
    DEFAULT_SOURCE=
    ```
+
 4. Restart the bot.
 
 What changes once it's set up:
@@ -214,6 +229,25 @@ SoundCloud needs no setup—it is played through yt-dlp.
 - SoundCloud track, playlist (`/sets/`) and profile links play from SoundCloud (playlists and profiles load up to 50 tracks, which can take ~30 seconds).
 - `/play <song> source:SoundCloud` and `/search <song> source:SoundCloud` search SoundCloud and fall back to YouTube when nothing is found.
 - Some label tracks are only available on SoundCloud as **30-second previews**. Searches skip them, and preview links or playlist entries play the full song from YouTube instead.
+
+### Additional sources
+
+Yandex Music, VK Music, Qobuz, and JioSaavn links are resolved natively with yt-dlp, including tracks and playlists when the upstream extractor supports them. Paste a service URL into `/play`; the bot labels the result with its original source and uses the same cache/playback flow as SoundCloud.
+
+Some catalogues require a signed-in account, premium subscription, or are region-restricted. In those cases, provide an appropriate browser or `cookies.txt` export through the existing `COOKIES_FROM_BROWSER` or `COOKIES_FILE` setting. If yt-dlp cannot extract the source, the command reports that no playable result was found rather than substituting an unrelated track.
+
+Flowery TTS is available without a music URL:
+
+```text
+/play ftts://Hello%20from%20Beatra
+/play ftts://Hello?voice=your_voice&speed=1.2
+```
+
+`tts:Hello from Beatra` is also accepted. Configure a default voice and audio options with the `FLOWERY_TTS_*` environment variables in `.env.example`.
+
+`/play` also recognises Mixcloud, OC Remix URLs (or an `OCR12345` identifier), Clyp.it, Reddit, getyarn, TikTok, Soundgasm, Pixeldrain, and Tumblr URLs through yt-dlp. `.streamDeckAudio` files are decoded as Stream Deck audio. Google Translate speech uses the plugin-compatible form `/play speak:Hello world`; set `GOOGLE_TTS_LANGUAGE` to change its language/accent.
+
+`phsearch:<query>` and Pornhub URLs are recognised only in Discord age-restricted channels. Availability of third-party sources depends on each service and yt-dlp's current extractor support.
 
 ---
 
@@ -253,10 +287,12 @@ Beatra uses **web scraping** by default to fetch lyrics from Genius—no API key
    - **Redirect URI:** `https://localhost/callback` (not used, but required)
 3. Click **Save** and reveal your **Client ID** and **Client Secret**.
 4. Copy both values and add them to your `.env`:
+
    ```dotenv
    GENIUS_CLIENT_ID=your_genius_client_id
    GENIUS_CLIENT_SECRET=your_genius_client_secret
    ```
+
 5. Restart the bot. The Genius client will now use API authentication.
 
 > 💡 **Note:** Even without credentials, lyrics work perfectly! The bot automatically scrapes Genius.com and falls back to LRCLIB if needed.
@@ -264,6 +300,7 @@ Beatra uses **web scraping** by default to fetch lyrics from Genius—no API key
 ### Lyrics Priority
 
 The bot fetches lyrics in this order:
+
 1. **Tidal** (Tidal tracks only, when Tidal playback is set up)
 2. **Genius** (with API key if provided, otherwise web scraping)
 3. **LRCLIB** (free lyrics database)
@@ -279,6 +316,7 @@ YouTube may occasionally block yt-dlp with a "Sign in to confirm you're not a bo
 
 1. Open your `.env` file or set environment variables
 2. Add one of the following based on your browser:
+
    ```env
    # For Chrome users
    COOKIES_FROM_BROWSER=chrome
@@ -309,6 +347,7 @@ YouTube may occasionally block yt-dlp with a "Sign in to confirm you're not a bo
 3. Place `cookies.txt` in your bot's root directory (same folder as `index.js`)
 
 4. Add to your `.env` file:
+
    ```env
    COOKIES_FILE=./cookies.txt
    ```
@@ -318,11 +357,13 @@ YouTube may occasionally block yt-dlp with a "Sign in to confirm you're not a bo
 ### Verifying the Fix
 
 After setting up cookies, test with:
+
 ```bash
 npm start
 ```
 
 If you still see bot detection errors:
+
 - Make sure you're logged into YouTube in your browser
 - Try clearing your browser cookies and logging in again
 - Regenerate the cookies.txt file
@@ -341,6 +382,7 @@ When your bot reaches **1,000+ servers**, Discord **requires** you to use shardi
 ### 🎯 What is Sharding?
 
 Sharding splits your bot into multiple instances (shards), each handling a subset of servers:
+
 - **Shard 0** might handle servers 1-1000
 - **Shard 1** might handle servers 1001-2000
 - And so on...
@@ -350,11 +392,13 @@ Discord automatically routes events to the correct shard based on server ID.
 ### 🚀 Quick Start with Sharding
 
 #### Sharded mode
+
 ```powershell
 pnpm run shard
 ```
 
 #### Normal mode (< 1000 servers)
+
 ```powershell
 pnpm start
 ```
@@ -419,16 +463,19 @@ The bot displays detailed shard information:
 ### 🛠️ Advanced Sharding
 
 #### Run Specific Shards
+
 ```dotenv
 SHARD_LIST=[0,1,2]  # Only spawn shards 0, 1, and 2
 ```
 
 #### Manual Shard Count
+
 ```dotenv
 TOTAL_SHARDS=4  # Force 4 shards regardless of server count
 ```
 
 #### Disable Auto-Respawn (Not Recommended)
+
 ```dotenv
 SHARD_RESPAWN=false
 ```
@@ -495,12 +542,14 @@ Beatra features an intelligent autoplay engine that keeps the music flowing when
 The autoplay system includes sophisticated filters to ensure you only get actual music:
 
 **Duration Limits:**
+
 - ✅ Minimum: 30 seconds
 - ✅ Maximum: 10 minutes (600 seconds)
 - ❌ Filters out: Full movies, podcasts, long tutorials, DJ sets
 
 **Keyword Blocking:**
 Automatically skips content containing:
+
 - Tutorial, lesson, course, how-to, guide
 - Podcast, interview, talk, speech, lecture
 - Review, unboxing, reaction, gameplay
@@ -509,6 +558,7 @@ Automatically skips content containing:
 - Mix, compilation (long-form content)
 
 **Quality Checks:**
+
 - Filters excessive emojis (spam/clickbait indicators)
 - Blocks playlist-style titles with many brackets
 - Prioritizes official music videos and verified uploads
@@ -528,6 +578,7 @@ Each genre uses optimized search terms to find the best content:
 ### Fallback Mechanism
 
 If the first search yields no suitable tracks after filtering:
+
 - Automatically retries with a different keyword from the genre pool
 - Ensures you always get music, never silence
 - Logs the entire process for transparency
@@ -535,6 +586,7 @@ If the first search yields no suitable tracks after filtering:
 ### Local Caching Integration
 
 All autoplay tracks leverage the same local cache system as manual plays:
+
 - **Pre-downloaded** before playback starts
 - **Zero buffering** during playback
 - **Instant playback** from local storage
@@ -570,12 +622,14 @@ Beatra eliminates playback interruptions by pre-downloading and caching all audi
 ### Why Local Caching?
 
 Traditional Discord bots stream directly from YouTube/Spotify/SoundCloud URLs, which causes:
+
 - ❌ Random buffering and stuttering during playback
 - ❌ Voice crackling when your ISP throttles streaming sites
 - ❌ Stream failures during Discord voice server load spikes
 - ❌ Quality drops when network conditions fluctuate
 
 **Beatra's solution:**
+
 - ✅ Downloads entire tracks to `audio_cache/` before playback
 - ✅ Streams from local disk at consistent quality
 - ✅ Zero dependency on external stream stability during playback
@@ -606,23 +660,27 @@ Traditional Discord bots stream directly from YouTube/Spotify/SoundCloud URLs, w
 ### Technical Details
 
 **Cache Directory:**
+
 - Location: `audio_cache/` (auto-created on first run)
 - Format: Opus audio (`.opus` extension) for optimal Discord voice quality
 - Naming: `track_[MD5 hash].opus` to prevent conflicts
 
 **Download Process:**
+
 - Uses `youtube-dl-exec` with best audio format selection
 - FFmpeg transcodes to Opus for Discord's native codec
 - Parallel downloads for multiple queued tracks
 - Retry logic for failed downloads with fallback streaming
 
 **Memory Management:**
+
 - Files persist only during active playback
 - Automatic deletion after track finishes
 - Graceful cleanup on bot shutdown or errors
 - Prevents disk bloat with aggressive pruning
 
 **Performance Benefits:**
+
 - **Zero mid-song buffering** – entire file ready before playback
 - **Fast skip/seek** – local I/O is instant vs. network round-trip
 - **Reliable autoplay** – pre-cached tracks guarantee smooth transitions
@@ -631,13 +689,12 @@ Traditional Discord bots stream directly from YouTube/Spotify/SoundCloud URLs, w
 ### Disk Space Considerations
 
 Average track sizes:
+
 - **3-5 minutes:** ~3-8 MB
 - **Queue of 10 tracks:** ~30-80 MB peak usage
 - **Auto-cleanup:** Disk usage drops to ~5-15 MB during playback
 
 The cache system requires minimal disk space and automatically manages itself. For VPS deployments, ensure at least **500 MB free space** for comfortable operation with large queues.
-
-
 
 ---
 
@@ -690,8 +747,6 @@ Add your own by copying `languages/en.json`, translating strings, and restarting
 3. Add or refine features (translation packs, UI tweaks, new providers).
 4. Open a pull request with a clear description and screenshots/console logs where relevant.
 
-
 ---
-
 
 Happy streaming, and keep the servers grooving! 🎧

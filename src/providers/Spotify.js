@@ -8,7 +8,7 @@ class Spotify {
 
     static isConfigured() {
         const { clientId, clientSecret } = config.spotify;
-        return !!clientId && !!clientSecret && clientId !== 'YOUR_SPOTIFY_CLIENT_ID' && clientSecret !== 'YOUR_SPOTIFY_CLIENT_SECRET';
+        return config.providers.isEnabled('spotify') && !!clientId && !!clientSecret && clientId !== 'YOUR_SPOTIFY_CLIENT_ID' && clientSecret !== 'YOUR_SPOTIFY_CLIENT_SECRET';
     }
 
     static async initializeApi() {

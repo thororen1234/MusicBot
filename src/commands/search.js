@@ -43,6 +43,11 @@ module.exports = {
             }
 
             const source = interaction.options.getString('source') || config.bot.defaultSource;
+            if (!config.providers.isEnabled(source)) {
+                return await interaction.editReply({
+                    content: `❌ ${config.providers.displayName(source)} is disabled by this bot's configuration.`
+                });
+            }
             if (source === 'tidal' && !Tidal.isConfigured()) {
                 return await interaction.editReply({
                     content: await LanguageManager.getTranslation(guildId, 'tidal.not_configured')

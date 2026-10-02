@@ -10,7 +10,7 @@ const { isExactQueryMatch } = require('../utils/TrackMatch');
 class Tidal {
     static isConfigured() {
         const { url, username, password } = config.tidal;
-        return !!(url && username && password);
+        return config.providers.isEnabled('tidal') && !!(url && username && password);
     }
 
     // Fresh token auth params for every request (token = md5(password + salt))

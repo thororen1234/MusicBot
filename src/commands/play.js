@@ -8,10 +8,10 @@ const ErrorHandler = require('../utils/ErrorHandler');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('play')
-        .setDescription('Plays music - YouTube, Spotify, Apple Music, Deezer, Tidal, SoundCloud or direct links')
+        .setDescription('Plays music from YouTube, supported services, TTS, or direct links')
         .addStringOption(option =>
             option.setName('query')
-                .setDescription('Song name, or a YouTube/Spotify/Apple Music/Deezer/Tidal/SoundCloud/direct link')
+                .setDescription('Song, supported URL, ftts://text, or direct audio link')
                 .setRequired(true)
         )
         .addStringOption(option =>
@@ -58,6 +58,11 @@ module.exports = {
             // Arama mesajı gönder
             const searchingMsg = await LanguageManager.getTranslation(guild.id, 'commands.play.searching_desc', { query });
             await interaction.editReply({ content: searchingMsg });
+
+            const ExternalSources = require('../providers/ExternalSources');
+            if (ExternalSources.requiresNsfwChannel(query) && !channel.nsfw) {
+                return await interaction.editReply({ content: '❌ This source can only be used in an age-restricted channel.' });
+            }
 
             // Sadece müzik verilerini al (player'a ekleme yapma)
             const source = interaction.options.getString('source') || config.bot.defaultSource;
@@ -135,19 +140,42 @@ module.exports = {
         const Tidal = require('../providers/Tidal');
         const SoundCloud = require('../providers/SoundCloud');
         const DirectLink = require('../providers/DirectLink');
+        const ExternalSources = require('../providers/ExternalSources');
+        const FloweryTTS = require('../providers/FloweryTTS');
+        const SpeechTTS = require('../providers/SpeechTTS');
+        const StreamDeckAudio = require('../providers/StreamDeckAudio');
 
         try {
             let tracks = [];
             let isPlaylist = false;
 
+            if (source === 'tidal' && !config.providers.isEnabled('tidal')) {
+                return { success: false, message: this.getProviderDisabledMessage('tidal') };
+            }
             if (source === 'tidal' && !Tidal.isConfigured()) {
                 return { success: false, message: await LanguageManager.getTranslation(guildId, 'tidal.not_configured') };
             }
 
             // Platform tespiti
             const platform = this.detectPlatform(query);
+            const provider = this.getProviderForPlatform(platform, query);
+            if (provider && !config.providers.isEnabled(provider)) {
+                return { success: false, message: this.getProviderDisabledMessage(provider) };
+            }
 
             switch (platform) {
+                case 'flowerytts':
+                    tracks = [FloweryTTS.getTrack(query)];
+                    break;
+
+                case 'speechtts':
+                    tracks = [SpeechTTS.getTrack(query)];
+                    break;
+
+                case 'streamdeck':
+                    tracks = [StreamDeckAudio.getTrack(query)];
+                    break;
+
                 case 'search':
                     if (source === 'tidal') {
                         // Only play from Tidal when it has an exact match, otherwise search YouTube
@@ -167,6 +195,9 @@ module.exports = {
                         }
                     }
                     if (tracks.length === 0) {
+                        if (!config.providers.isEnabled('youtube')) {
+                            return { success: false, message: this.getProviderDisabledMessage('youtube') };
+                        }
                         tracks = await YouTube.search(query, 1, guildId);
                     }
                     break;
@@ -228,6 +259,10 @@ module.exports = {
                     ({ tracks, isPlaylist } = await SoundCloud.getFromURL(query));
                     break;
 
+                case 'external':
+                    ({ tracks, isPlaylist } = await ExternalSources.getFromURL(query));
+                    break;
+
                 case 'direct':
                     const directData = await DirectLink.getInfo(query);
                     tracks = directData || [];
@@ -259,8 +294,18 @@ module.exports = {
         const SongLink = require('../providers/SongLink');
         const Tidal = require('../providers/Tidal');
         const SoundCloud = require('../providers/SoundCloud');
+        const ExternalSources = require('../providers/ExternalSources');
+        const FloweryTTS = require('../providers/FloweryTTS');
+        const SpeechTTS = require('../providers/SpeechTTS');
+        const StreamDeckAudio = require('../providers/StreamDeckAudio');
 
-        if (query.includes('youtube.com') || query.includes('youtu.be')) {
+        if (FloweryTTS.isQuery(query)) {
+            return 'flowerytts';
+        } else if (SpeechTTS.isQuery(query)) {
+            return 'speechtts';
+        } else if (StreamDeckAudio.isSupportedURL(query)) {
+            return 'streamdeck';
+        } else if (query.includes('youtube.com') || query.includes('youtu.be')) {
             return 'youtube';
         } else if (Tidal.isConfigured() && Tidal.parseURL(query)) {
             return 'tidal';
@@ -268,6 +313,8 @@ module.exports = {
             return 'songlink';
         } else if (SoundCloud.isSoundCloudURL(query)) {
             return 'soundcloud';
+        } else if (ExternalSources.isSupportedURL(query)) {
+            return 'external';
         } else if (query.startsWith('http') && (query.includes('.mp3') || query.includes('.wav') || query.includes('.ogg'))) {
             return 'direct';
         } else if (/^https?:\/\//i.test(query)) {
@@ -275,5 +322,26 @@ module.exports = {
         } else {
             return 'search';
         }
+    },
+
+    getProviderForPlatform(platform, query) {
+        const SongLink = require('../providers/SongLink');
+        const ExternalSources = require('../providers/ExternalSources');
+        const providers = {
+            youtube: 'youtube',
+            soundcloud: 'soundcloud',
+            direct: 'direct',
+            tidal: 'tidal',
+            flowerytts: 'flowerytts',
+            speechtts: 'speechtts',
+            streamdeck: 'streamdeck',
+        };
+        if (platform === 'songlink') return SongLink.getProviderId(query);
+        if (platform === 'external') return ExternalSources.getSource(query)?.id || null;
+        return providers[platform] || null;
+    },
+
+    getProviderDisabledMessage(provider) {
+        return `❌ ${config.providers.displayName(provider)} is disabled by this bot's configuration.`;
     }
 };
