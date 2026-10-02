@@ -1,6 +1,7 @@
 const axios = require('axios');
 const crypto = require('crypto');
 const config = require('../config');
+const { isExactQueryMatch } = require('./TrackMatch');
 
 /**
  * Plays music from Tidal through a TidalSubsonic server (https://github.com/vMohammad24/TidalSubsonic),
@@ -44,6 +45,16 @@ class Tidal {
             throw tidalError;
         }
         return data;
+    }
+
+    // Any Tidal link, including short links and mixes that parseURL can't read
+    static isTidalURL(query) {
+        try {
+            const { hostname } = new URL(query);
+            return /(^|\.)tidal\.(com|link)$/.test(hostname.toLowerCase());
+        } catch {
+            return false;
+        }
     }
 
     /**
@@ -99,6 +110,12 @@ class Tidal {
             artistCount: 0,
         });
         return (data.searchResult3?.song || []).slice(0, limit).map(song => this.formatTrack(song));
+    }
+
+    // First of the top results that exactly matches the query, or null
+    static async findExact(query) {
+        const results = await this.search(query, 5);
+        return results.find(track => isExactQueryMatch(query, track)) || null;
     }
 
     static formatTrack(song) {

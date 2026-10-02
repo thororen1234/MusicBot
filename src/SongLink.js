@@ -2,6 +2,7 @@ const axios = require('axios');
 const config = require('../config');
 const YouTube = require('./YouTube');
 const Tidal = require('./Tidal');
+const { normalizeTitle, isExactTrackMatch } = require('./TrackMatch');
 
 // Music services resolved through the SongLink API (YouTube and SoundCloud links are played natively)
 const SUPPORTED_HOSTS = [
@@ -68,7 +69,7 @@ class SongLink {
         if (source === 'tidal' && links.tidal?.url && Tidal.parseURL(links.tidal.url)) {
             try {
                 const result = await Tidal.getFromURL(links.tidal.url);
-                if (result.tracks.length > 0) return result;
+                if (result.tracks.length > 0 && this.isExactMatch(entity, result)) return result;
             } catch (error) {
                 console.error(error.message);
             }
@@ -105,6 +106,15 @@ class SongLink {
             }],
             isPlaylist: false,
         };
+    }
+
+    // Only trust the Tidal match when it is exactly the requested song/album, otherwise fall back to YouTube
+    static isExactMatch(entity, result) {
+        if (!entity.title) return true;
+        if (entity.type === 'album') {
+            return normalizeTitle(entity.title) === normalizeTitle(result.tracks[0].album);
+        }
+        return isExactTrackMatch({ title: entity.title, artist: entity.artistName }, result.tracks[0]);
     }
 
     // music.youtube.com links -> www.youtube.com so the existing YouTube helpers recognise them

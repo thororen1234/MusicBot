@@ -147,27 +147,17 @@ module.exports = {
             const platform = this.detectPlatform(query);
 
             switch (platform) {
-                case 'tidal':
-                    // Tidal links always play straight from Tidal when it's set up
-                    try {
-                        ({ tracks, isPlaylist } = await Tidal.getFromURL(query));
-                    } catch (error) {
-                        console.error(error.message);
-                        const errorMsg = await LanguageManager.getTranslation(guildId, `tidal.${error.reason || 'failed'}`);
-                        return { success: false, message: errorMsg };
-                    }
-                    break;
-
                 case 'search':
                     if (source === 'tidal') {
+                        // Only play from Tidal when it has an exact match, otherwise search YouTube
                         try {
-                            tracks = await Tidal.search(query, 1);
+                            const match = await Tidal.findExact(query);
+                            if (match) tracks = [match];
                         } catch (error) {
                             console.error(error.message);
-                            const errorMsg = await LanguageManager.getTranslation(guildId, `tidal.${error.reason || 'failed'}`);
-                            return { success: false, message: errorMsg };
                         }
-                    } else {
+                    }
+                    if (tracks.length === 0) {
                         tracks = await YouTube.search(query, 1, guildId);
                     }
                     break;
@@ -188,11 +178,22 @@ module.exports = {
                     }
                     break;
 
+                case 'tidal':
+                    // Tidal links play straight from Tidal when it's set up
+                    try {
+                        ({ tracks, isPlaylist } = await Tidal.getFromURL(query));
+                    } catch (error) {
+                        console.error(error.message);
+                    }
+                    if (tracks.length > 0) break;
+                    // Tidal couldn't play it - fall through and resolve the link via SongLink (YouTube fallback)
                 case 'songlink': {
-                    // Spotify/Apple Music/Deezer/Tidal links -> matching Tidal or YouTube track via the SongLink API
+                    // Spotify/Apple Music/Deezer/Tidal links -> matching Tidal or YouTube track via the SongLink API.
+                    // Tidal links always prefer Tidal when it's set up, whatever the chosen source.
+                    const linkSource = Tidal.isConfigured() && Tidal.isTidalURL(query) ? 'tidal' : source;
                     let songlinkError = null;
                     try {
-                        ({ tracks, isPlaylist } = await SongLink.getTracks(query, guildId, source));
+                        ({ tracks, isPlaylist } = await SongLink.getTracks(query, guildId, linkSource));
                     } catch (error) {
                         songlinkError = error;
                         console.error(error.message);
