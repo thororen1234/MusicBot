@@ -13,6 +13,7 @@ const YouTube = require('./YouTube');
 const Spotify = require('./Spotify');
 const SoundCloud = require('./SoundCloud');
 const DirectLink = require('./DirectLink');
+const Tidal = require('./Tidal');
 const LanguageManager = require('./LanguageManager');
 const ErrorHandler = require('./ErrorHandler');
 const PlayerStateManager = require('./PlayerStateManager');
@@ -821,6 +822,10 @@ class MusicPlayer {
 
                     case 'direct':
                         streamInfo = await DirectLink.getStream(streamUrl, resumeFromSeconds);
+                        break;
+
+                    case 'tidal':
+                        streamInfo = Tidal.getStream(this.currentTrack);
                         break;
 
                     default:
@@ -1822,6 +1827,9 @@ class MusicPlayer {
                 case 'direct':
                     streamInfo = await DirectLink.getStream(streamUrl);
                     break;
+                case 'tidal':
+                    streamInfo = Tidal.getStream(track);
+                    break;
             }
 
             if (streamInfo) {
@@ -1860,6 +1868,7 @@ class MusicPlayer {
             youtube: '🔴',
             spotify: '🟢',
             soundcloud: '🟠',
+            tidal: '⚫',
             direct: '🔗'
         };
         return emojis[platform] || '🎵';

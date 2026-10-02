@@ -1,6 +1,7 @@
 const axios = require('axios');
 const config = require('../config');
 const YouTube = require('./YouTube');
+const Tidal = require('./Tidal');
 
 // Music services resolved through the SongLink API (YouTube and SoundCloud links are played natively)
 const SUPPORTED_HOSTS = [
@@ -55,13 +56,24 @@ class SongLink {
     }
 
     /**
-     * Resolves a music link to a playable YouTube track.
+     * Resolves a music link to playable tracks - from Tidal when `source` is 'tidal' and there's a match,
+     * otherwise from YouTube.
      * @returns {Promise<{tracks: object[], isPlaylist: boolean}>}
      */
-    static async getTracks(url, guildId = null) {
+    static async getTracks(url, guildId = null, source = 'youtube') {
         const data = await this.getLinks(url);
         const entity = data.entitiesByUniqueId?.[data.entityUniqueId] || {};
         const links = data.linksByPlatform || {};
+
+        if (source === 'tidal' && links.tidal?.url && Tidal.parseURL(links.tidal.url)) {
+            try {
+                const result = await Tidal.getFromURL(links.tidal.url);
+                if (result.tracks.length > 0) return result;
+            } catch (error) {
+                console.error(error.message);
+            }
+        }
+
         const youtubeUrl = links.youtube?.url || this.toYouTubeURL(links.youtubeMusic?.url);
 
         // The API only matches songs on YouTube, so albums have no YouTube link

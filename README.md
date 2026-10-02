@@ -137,6 +137,10 @@ CLIENT_ID=your_application_id
 GUILD_ID=optional_guild_for_fast_testing
 SONGLINK_API_URL=https://songs.thororen.com
 SONGLINK_API_KEY=optional_songlink_api_key
+TIDAL_SUBSONIC_URL=https://your-tidalsubsonic-server
+TIDAL_SUBSONIC_USER=subsonic_user
+TIDAL_SUBSONIC_PASSWORD=subsonic_password
+DEFAULT_SOURCE=youtube
 SPOTIFY_CLIENT_ID=optional_spotify_client_id
 SPOTIFY_CLIENT_SECRET=optional_spotify_client_secret
 GENIUS_CLIENT_ID=optional_genius_client_id
@@ -160,6 +164,8 @@ COOKIES_FILE=./cookies.txt
 | `bot.embedColor` | `.env`/`config.js` | Hex color for all embeds. |
 | `bot.supportServer` & `bot.website` | `.env`/`config.js` | Populates help links and README badges. |
 | `songlink.apiUrl` & `songlink.apiKey` | `.env`/`config.js` | SongLink API (Odesli-compatible) used to convert Spotify, Apple Music, Deezer and Tidal links to YouTube. Defaults to `https://songs.thororen.com`. |
+| `tidal.url`, `tidal.username` & `tidal.password` | `.env`/`config.js` | Optional [TidalSubsonic](https://github.com/vMohammad24/TidalSubsonic) server login. Tidal links then play from Tidal, and `/play source:Tidal` searches Tidal and plays Spotify/Apple Music/Deezer links from their Tidal match. |
+| `bot.defaultSource` | `.env` (`DEFAULT_SOURCE`) | `youtube` (default) or `tidal` - the `/play` source used when none is picked. |
 | `spotify.clientId` & `spotify.clientSecret` | `.env`/`config.js` | Optional fallback for Spotify playlist, album and artist links, which SongLink can't convert to YouTube. |
 | `genius.clientId` & `genius.clientSecret` | `.env`/`config.js` | Optional Genius API credentials for higher rate limits (works without via web scraping). |
 | `ytdl.cookiesFromBrowser` & `ytdl.cookiesFile` | `.env`/`config.js` | It is an optional feature to add cookies against YouTube cookie errors. |

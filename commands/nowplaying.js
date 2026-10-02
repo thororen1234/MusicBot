@@ -262,6 +262,7 @@ module.exports = {
             youtube: '🔴',
             spotify: '🟢',
             soundcloud: '🟠',
+            tidal: '⚫',
             direct: '🔗'
         };
         return emojis[platform] || '🎵';

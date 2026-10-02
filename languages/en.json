@@ -22,7 +22,7 @@
       "main_description": "**Discord's most advanced music bot!** You can use the following commands and features.",
       "commands_title": "📝 Commands",
       "commands_list": [
-        "`/play <song/url>` - Play music (YouTube, Spotify, SoundCloud)",
+        "`/play <song/url> [source]` - Play music (YouTube, Tidal, Spotify, SoundCloud and more)",
         "`/nowplaying` - Information about the current song",
         "`/queue [page]` - Show the music queue",
         "`/help` - Display this help menu",
@@ -97,6 +97,7 @@
       "platform_name_spotify": "Spotify",
       "platform_name_soundcloud": "SoundCloud",
       "platform_name_direct": "Direct Link",
+      "platform_name_tidal": "Tidal",
       "platform_name_unknown": "Unknown",
       "progress": "⏱️ Progress",
       "requested_by": "👤 Requested by",
@@ -161,6 +162,12 @@
     "no_playlist_entries": "No playlist entries found",
     "no_playlist_info": "Could not get playlist information",
     "no_valid_tracks": "No valid tracks found in the playlist"
+  },
+  "tidal": {
+    "not_configured": "❌ Tidal playback isn't set up on this bot.",
+    "auth_failed": "❌ Couldn't log in to the Tidal server - check `TIDAL_SUBSONIC_USER` / `TIDAL_SUBSONIC_PASSWORD`.",
+    "not_found": "❌ Couldn't find that on Tidal.",
+    "failed": "❌ Couldn't reach Tidal right now - try again later."
   },
   "songlink": {
     "invalid_key": "❌ The SongLink API key is invalid (`SONGLINK_API_KEY`).",

@@ -15,6 +15,13 @@ module.exports = {
         apiKey: process.env.SONGLINK_API_KEY || '', // Only needed if the API has API_KEYS set
     },
 
+    // TidalSubsonic server for playing from Tidal (https://github.com/vMohammad24/TidalSubsonic)
+    tidal: {
+        url: (process.env.TIDAL_SUBSONIC_URL || '').replace(/\/+$/, ''),
+        username: process.env.TIDAL_SUBSONIC_USER || '',
+        password: process.env.TIDAL_SUBSONIC_PASSWORD || '',
+    },
+
     // Spotify API Settings (optional fallback for Spotify playlists/artists)
     spotify: {
         clientId: process.env.SPOTIFY_CLIENT_ID || 'YOUR_SPOTIFY_CLIENT_ID',
@@ -34,6 +41,7 @@ module.exports = {
         maxPlaylistSize: 50,
         status: process.env.STATUS || '🎵 Beatra | /play',
         embedColor: process.env.EMBED_COLOR || '#FF6B6B',
+        defaultSource: (process.env.DEFAULT_SOURCE || '').trim().toLowerCase() === 'tidal' ? 'tidal' : 'youtube', // Default /play source - YouTube unless set to tidal
         supportServer: process.env.SUPPORT_SERVER || 'https://discord.gg/ACJQzJuckW',
         website: process.env.WEBSITE || 'https://beatra.app',
         invite: 'https://discord.com/oauth2/authorize?client_id=' + process.env.CLIENT_ID + '&permissions=8&scope=bot%20applications.commands',

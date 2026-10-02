@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const config = require('../config');
 const MusicPlayer = require('../src/MusicPlayer');
 const MusicEmbedManager = require('../src/MusicEmbedManager');
 const LanguageManager = require('../src/LanguageManager');
@@ -12,6 +13,14 @@ module.exports = {
             option.setName('query')
                 .setDescription('Song name, or a YouTube/Spotify/Apple Music/Deezer/Tidal/SoundCloud/direct link')
                 .setRequired(true)
+        )
+        .addStringOption(option =>
+            option.setName('source')
+                .setDescription('Where to play searches and Spotify/Apple Music/Deezer links from')
+                .addChoices(
+                    { name: 'YouTube', value: 'youtube' },
+                    { name: 'Tidal', value: 'tidal' }
+                )
         ),
 
     async execute(interaction, client) {
@@ -50,7 +59,8 @@ module.exports = {
             await interaction.editReply({ content: searchingMsg });
 
             // Sadece müzik verilerini al (player'a ekleme yapma)
-            const trackData = await this.getTrackData(query, guild.id);
+            const source = interaction.options.getString('source') || config.bot.defaultSource;
+            const trackData = await this.getTrackData(query, guild.id, source);
 
             if (!trackData.success) {
                 return await interaction.editReply({
@@ -117,10 +127,11 @@ module.exports = {
         return { success: true };
     },
 
-    async getTrackData(query, guildId) {
+    async getTrackData(query, guildId, source = 'youtube') {
         const YouTube = require('../src/YouTube');
         const Spotify = require('../src/Spotify');
         const SongLink = require('../src/SongLink');
+        const Tidal = require('../src/Tidal');
         const SoundCloud = require('../src/SoundCloud');
         const DirectLink = require('../src/DirectLink');
 
@@ -128,10 +139,39 @@ module.exports = {
             let tracks = [];
             let isPlaylist = false;
 
+            if (source === 'tidal' && !Tidal.isConfigured()) {
+                return { success: false, message: await LanguageManager.getTranslation(guildId, 'tidal.not_configured') };
+            }
+
             // Platform tespiti
             const platform = this.detectPlatform(query);
 
             switch (platform) {
+                case 'tidal':
+                    // Tidal links always play straight from Tidal when it's set up
+                    try {
+                        ({ tracks, isPlaylist } = await Tidal.getFromURL(query));
+                    } catch (error) {
+                        console.error(error.message);
+                        const errorMsg = await LanguageManager.getTranslation(guildId, `tidal.${error.reason || 'failed'}`);
+                        return { success: false, message: errorMsg };
+                    }
+                    break;
+
+                case 'search':
+                    if (source === 'tidal') {
+                        try {
+                            tracks = await Tidal.search(query, 1);
+                        } catch (error) {
+                            console.error(error.message);
+                            const errorMsg = await LanguageManager.getTranslation(guildId, `tidal.${error.reason || 'failed'}`);
+                            return { success: false, message: errorMsg };
+                        }
+                    } else {
+                        tracks = await YouTube.search(query, 1, guildId);
+                    }
+                    break;
+
                 case 'youtube':
                     // YouTube playlist/video kontrolü
                     if (YouTube.isPlaylist && YouTube.isPlaylist(query)) {
@@ -149,10 +189,10 @@ module.exports = {
                     break;
 
                 case 'songlink': {
-                    // Spotify/Apple Music/Deezer/Tidal links -> matching YouTube track via the SongLink API
+                    // Spotify/Apple Music/Deezer/Tidal links -> matching Tidal or YouTube track via the SongLink API
                     let songlinkError = null;
                     try {
-                        ({ tracks, isPlaylist } = await SongLink.getTracks(query, guildId));
+                        ({ tracks, isPlaylist } = await SongLink.getTracks(query, guildId, source));
                     } catch (error) {
                         songlinkError = error;
                         console.error(error.message);
@@ -207,17 +247,22 @@ module.exports = {
 
     detectPlatform(query) {
         const SongLink = require('../src/SongLink');
+        const Tidal = require('../src/Tidal');
 
         if (query.includes('youtube.com') || query.includes('youtu.be')) {
             return 'youtube';
+        } else if (Tidal.isConfigured() && Tidal.parseURL(query)) {
+            return 'tidal';
         } else if (SongLink.isSupportedURL(query)) {
             return 'songlink';
         } else if (query.includes('soundcloud.com')) {
             return 'soundcloud';
         } else if (query.startsWith('http') && (query.includes('.mp3') || query.includes('.wav') || query.includes('.ogg'))) {
             return 'direct';
+        } else if (/^https?:\/\//i.test(query)) {
+            return 'youtube'; // Other links keep the old behaviour (YouTube search)
         } else {
-            return 'youtube'; // Default to YouTube search
+            return 'search';
         }
     }
 };
