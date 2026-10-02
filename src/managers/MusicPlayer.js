@@ -25,6 +25,7 @@ const LyricsManager = require('./LyricsManager');
 const prism = require('prism-media');
 const ffmpegPath = require('ffmpeg-static');
 const { Readable } = require('stream');
+const { spawn } = require('child_process');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
@@ -48,6 +49,59 @@ async function ensureFetch() {
         cachedFetch = mod.default;
     }
     return cachedFetch;
+}
+
+/**
+ * Transcode a readable stream to an Opus file. prism.FFmpeg is deliberately
+ * not used here: it always appends `pipe:1` as an output, which is incompatible
+ * with writing directly to a file and causes its stdin to fail with EPIPE.
+ */
+function transcodeStreamToOpus(audioStream, filepath) {
+    if (!audioStream || typeof audioStream.pipe !== 'function') {
+        return Promise.reject(new Error('No readable audio stream available for transcoding'));
+    }
+
+    return new Promise((resolve, reject) => {
+        const ffmpeg = spawn(ffmpegPath, [
+            '-i', 'pipe:0',
+            '-f', 'opus',
+            '-ar', '48000',
+            '-ac', '2',
+            '-b:a', '128k',
+            '-y',
+            filepath
+        ], {
+            stdio: ['pipe', 'ignore', 'pipe'],
+            windowsHide: true
+        });
+        let stderr = '';
+        let inputError = null;
+
+        ffmpeg.stderr.setEncoding('utf8');
+        ffmpeg.stderr.on('data', chunk => {
+            // Keep the useful tail without allowing a broken stream to grow logs in memory.
+            stderr = (stderr + chunk).slice(-4096);
+        });
+        ffmpeg.stdin.on('error', error => {
+            inputError = error;
+        });
+        audioStream.on('error', error => {
+            inputError = error;
+        });
+        audioStream.pipe(ffmpeg.stdin);
+
+        ffmpeg.once('error', reject);
+        ffmpeg.once('close', code => {
+            if (code === 0 && !inputError) {
+                resolve();
+                return;
+            }
+
+            const details = stderr.trim();
+            const reason = details || inputError?.message || 'no diagnostic output';
+            reject(new Error(`FFmpeg exited with code ${code}: ${reason}`));
+        });
+    });
 }
 
 class MusicPlayer {
@@ -564,29 +618,7 @@ class MusicPlayer {
                         : response.body;
                 }
 
-                // Transcode to opus
-                const ffmpegProcess = new prism.FFmpeg({
-                    command: ffmpegPath,
-                    args: [
-                        '-i', 'pipe:0',
-                        '-f', 'opus',
-                        '-ar', '48000',
-                        '-ac', '2',
-                        '-b:a', '128k',
-                        '-y',
-                        filepath
-                    ]
-                });
-
-                audioStream.pipe(ffmpegProcess);
-
-                await new Promise((resolve, reject) => {
-                    ffmpegProcess.on('close', (code) => {
-                        if (code === 0) resolve();
-                        else reject(new Error(`FFmpeg exited with code ${code}`));
-                    });
-                    ffmpegProcess.on('error', reject);
-                });
+                await transcodeStreamToOpus(audioStream, filepath);
             }
 
             // Verify file
@@ -604,6 +636,9 @@ class MusicPlayer {
 
         } catch (error) {
             this.downloadingFiles.delete(filepath); // Remove from downloading set on error
+            // A failed transcode can leave a non-empty, corrupt file that would
+            // otherwise be mistaken for a valid cache hit on the next attempt.
+            await fs.unlink(filepath).catch(() => { });
             console.error(`❌ Download failed for ${track.title}:`, error.message);
             throw error;
         }
