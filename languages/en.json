@@ -24,6 +24,7 @@
       "commands_list": [
         "`/play <song/url>` - Play music (YouTube, Spotify, SoundCloud)",
         "`/nowplaying` - Information about the current song",
+        "`/queue [page]` - Show the music queue",
         "`/help` - Display this help menu",
         "`/search <query>` - Search and select music on YouTube"
       ],
@@ -39,7 +40,7 @@
       "platforms_title": "🌐 Supported Platforms",
       "platforms_list": [
         "🔴 **YouTube** - Video/music links and search",
-        "🟢 **Spotify** - Song/playlist/album links",
+        "🟢 **Spotify, Apple Music, Deezer, Tidal** - Song links (played via YouTube)",
         "🟠 **SoundCloud** - Music links and search",
         "🔗 **Direct Link** - MP3, WAV, OGG files"
       ],
@@ -113,9 +114,17 @@
       "error_title": "❌ Error",
       "error_getting_info": "❌ An error occurred while getting song information!"
     },
+    "queue": {
+      "title": "📝 Queue",
+      "empty": "❌ The queue is empty!",
+      "now_playing": "🎵 Now Playing",
+      "up_next": "📋 Up Next ({count})",
+      "nothing_up_next": "*Nothing queued — add songs with `/play`*",
+      "footer": "Page {page}/{pages} • {count} songs • {duration} total"
+    },
     "play": {
-      "description": "Play music - supports YouTube, Spotify, SoundCloud or direct link",
-      "query_description": "Song name, artist, YouTube/Spotify/SoundCloud URL or direct link",
+      "description": "Play music - supports YouTube, Spotify, Apple Music, Deezer, Tidal, SoundCloud or direct link",
+      "query_description": "Song name, or a YouTube/Spotify/Apple Music/Deezer/Tidal/SoundCloud/direct link",
       "voice_channel_required": "❌ You must be in a voice channel!",
       "no_permissions": "❌ I don't have permission to speak in this voice channel!",
       "same_channel_required": "❌ You must be in the same voice channel as the bot!",
@@ -152,6 +161,13 @@
     "no_playlist_entries": "No playlist entries found",
     "no_playlist_info": "Could not get playlist information",
     "no_valid_tracks": "No valid tracks found in the playlist"
+  },
+  "songlink": {
+    "invalid_key": "❌ The SongLink API key is invalid (`SONGLINK_API_KEY`).",
+    "not_found": "❌ Couldn't find a match for this link.",
+    "album_unsupported": "❌ Albums from this service can't be played yet - send a song link instead.",
+    "platform_unavailable": "❌ The link service isn't set up for this platform yet.",
+    "failed": "❌ Couldn't convert this link right now - try again later."
   },
   "spotify": {
     "invalid_url": "Invalid Spotify URL",

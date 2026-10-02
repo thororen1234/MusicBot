@@ -7,10 +7,10 @@ const ErrorHandler = require('../src/ErrorHandler');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('play')
-        .setDescription('Plays music - Supports YouTube, Spotify, SoundCloud or direct links')
+        .setDescription('Plays music - YouTube, Spotify, Apple Music, Deezer, Tidal, SoundCloud or direct links')
         .addStringOption(option =>
             option.setName('query')
-                .setDescription('Song name, artist, YouTube/Spotify/SoundCloud URL or direct link')
+                .setDescription('Song name, or a YouTube/Spotify/Apple Music/Deezer/Tidal/SoundCloud/direct link')
                 .setRequired(true)
         ),
 
@@ -120,6 +120,7 @@ module.exports = {
     async getTrackData(query, guildId) {
         const YouTube = require('../src/YouTube');
         const Spotify = require('../src/Spotify');
+        const SongLink = require('../src/SongLink');
         const SoundCloud = require('../src/SoundCloud');
         const DirectLink = require('../src/DirectLink');
 
@@ -147,20 +148,30 @@ module.exports = {
                     }
                     break;
 
-                case 'spotify':
-                    // Check if it's a Spotify URL (playlist, album, track, or artist)
-                    if (Spotify.isSpotifyURL(query)) {
-                        const spotifyData = await Spotify.getFromURL(query, guildId);
-                        tracks = spotifyData || [];
-                        // Check if it's a playlist/album/artist (multiple tracks)
+                case 'songlink': {
+                    // Spotify/Apple Music/Deezer/Tidal links -> matching YouTube track via the SongLink API
+                    let songlinkError = null;
+                    try {
+                        ({ tracks, isPlaylist } = await SongLink.getTracks(query, guildId));
+                    } catch (error) {
+                        songlinkError = error;
+                        console.error(error.message);
+                    }
+
+                    // SongLink can't resolve Spotify playlists/artists/albums to YouTube - use the Spotify API for those when it's set up
+                    if (tracks.length === 0 && Spotify.isSpotifyURL(query) && Spotify.isConfigured()) {
+                        tracks = await Spotify.getFromURL(query, guildId) || [];
                         const { type } = Spotify.parseSpotifyURL(query);
                         isPlaylist = type === 'playlist' || type === 'album' || type === 'artist';
-                    } else {
-                        // Regular search
-                        const spotifyData = await Spotify.search(query, 1, 'track', guildId);
-                        tracks = spotifyData || [];
+                    }
+
+                    if (tracks.length === 0) {
+                        const reason = songlinkError?.reason || 'not_found';
+                        const errorMsg = await LanguageManager.getTranslation(guildId, `songlink.${reason}`);
+                        return { success: false, message: errorMsg };
                     }
                     break;
+                }
 
                 case 'soundcloud':
                     const soundcloudData = await SoundCloud.search(query, 1, guildId);
@@ -195,10 +206,12 @@ module.exports = {
     },
 
     detectPlatform(query) {
+        const SongLink = require('../src/SongLink');
+
         if (query.includes('youtube.com') || query.includes('youtu.be')) {
             return 'youtube';
-        } else if (query.includes('spotify.com')) {
-            return 'spotify';
+        } else if (SongLink.isSupportedURL(query)) {
+            return 'songlink';
         } else if (query.includes('soundcloud.com')) {
             return 'soundcloud';
         } else if (query.startsWith('http') && (query.includes('.mp3') || query.includes('.wav') || query.includes('.ogg'))) {

@@ -135,12 +135,14 @@ Beatra reads from both `config.js` defaults and environment variables via `.env`
 DISCORD_TOKEN=your_bot_token
 CLIENT_ID=your_application_id
 GUILD_ID=optional_guild_for_fast_testing
-SPOTIFY_CLIENT_ID=spotify_client_id
-SPOTIFY_CLIENT_SECRET=spotify_client_secret
+SONGLINK_API_URL=https://songs.thororen.com
+SONGLINK_API_KEY=optional_songlink_api_key
+SPOTIFY_CLIENT_ID=optional_spotify_client_id
+SPOTIFY_CLIENT_SECRET=optional_spotify_client_secret
 GENIUS_CLIENT_ID=optional_genius_client_id
 GENIUS_CLIENT_SECRET=optional_genius_client_secret
 STATUS=🎵 Beatra | /play
-EMBED_COLOR=#FF6B6B
+EMBED_COLOR="#FF6B6B"
 SUPPORT_SERVER=https://discord.gg/ACJQzJuckW
 WEBSITE=https://beatra.app
 COOKIES_FROM_BROWSER=chrome
@@ -157,7 +159,8 @@ COOKIES_FILE=./cookies.txt
 | `bot.status` | `.env`/`config.js` | Activity text shown as "Listening to ...". |
 | `bot.embedColor` | `.env`/`config.js` | Hex color for all embeds. |
 | `bot.supportServer` & `bot.website` | `.env`/`config.js` | Populates help links and README badges. |
-| `spotify.clientId` & `spotify.clientSecret` | `.env`/`config.js` | Enables Spotify search, playlist and album expansion. |
+| `songlink.apiUrl` & `songlink.apiKey` | `.env`/`config.js` | SongLink API (Odesli-compatible) used to convert Spotify, Apple Music, Deezer and Tidal links to YouTube. Defaults to `https://songs.thororen.com`. |
+| `spotify.clientId` & `spotify.clientSecret` | `.env`/`config.js` | Optional fallback for Spotify playlist, album and artist links, which SongLink can't convert to YouTube. |
 | `genius.clientId` & `genius.clientSecret` | `.env`/`config.js` | Optional Genius API credentials for higher rate limits (works without via web scraping). |
 | `ytdl.cookiesFromBrowser` & `ytdl.cookiesFile` | `.env`/`config.js` | It is an optional feature to add cookies against YouTube cookie errors. |
 

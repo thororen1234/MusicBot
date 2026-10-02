@@ -620,30 +620,6 @@ module.exports = {
         });
     },
 
-    createProgressBar(current, total) {
-        if (!total || total === 0) return '0:00 / 0:00';
-
-        const currentSeconds = Math.floor(current / 1000);
-        const totalSeconds = Math.floor(total);
-        const progress = Math.floor((currentSeconds / totalSeconds) * 20);
-
-        const bar = '█'.repeat(progress) + '░'.repeat(20 - progress);
-
-        return `${this.formatTime(currentSeconds)} [${'▓'.repeat(progress)}${'░'.repeat(20 - progress)}] ${this.formatTime(totalSeconds)}`;
-    },
-
-    formatTime(seconds) {
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        const secs = seconds % 60;
-
-        if (hours > 0) {
-            return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        } else {
-            return `${minutes}:${secs.toString().padStart(2, '0')}`;
-        }
-    },
-
     async handleHelpRefresh(interaction) {
         try {
             // Defer the interaction to show loading state

@@ -9,7 +9,13 @@ module.exports = {
         guildId: process.env.GUILD_ID || null, // Leave null for global commands
     },
 
-    // Spotify API Settings
+    // SongLink API Settings (converts Spotify/Apple Music/Deezer/Tidal links to YouTube)
+    songlink: {
+        apiUrl: (process.env.SONGLINK_API_URL || '').replace(/\/+$/, ''),
+        apiKey: process.env.SONGLINK_API_KEY || '', // Only needed if the API has API_KEYS set
+    },
+
+    // Spotify API Settings (optional fallback for Spotify playlists/artists)
     spotify: {
         clientId: process.env.SPOTIFY_CLIENT_ID || 'YOUR_SPOTIFY_CLIENT_ID',
         clientSecret: process.env.SPOTIFY_CLIENT_SECRET || 'YOUR_SPOTIFY_CLIENT_SECRET',
@@ -67,23 +73,23 @@ module.exports = {
         // Or set a specific number (e.g., 2, 4, 8, etc.)
         // Formula: Math.ceil(total_guilds / 1000) = recommended shards
         totalShards: process.env.TOTAL_SHARDS || 'auto',
-        
+
         // Shard list to spawn (default: 'auto' spawns all)
         // Example: [0, 1, 2] to spawn specific shards
         shardList: process.env.SHARD_LIST || 'auto',
-        
+
         // Sharding mode: 'process' (recommended) or 'worker'
         // 'process' = each shard runs in separate Node.js process (more stable)
         // 'worker' = each shard runs in worker thread (less memory, experimental)
         mode: process.env.SHARD_MODE || 'process',
-        
+
         // Auto-respawn crashed shards (recommended: true)
         respawn: process.env.SHARD_RESPAWN !== 'false',
-        
+
         // Delay between spawning each shard (milliseconds)
         // Discord recommends 5000-5500ms to avoid rate limits
         spawnDelay: parseInt(process.env.SHARD_SPAWN_DELAY) || 5500,
-        
+
         // Timeout for shard ready event (milliseconds)
         spawnTimeout: parseInt(process.env.SHARD_SPAWN_TIMEOUT) || 30000,
     }

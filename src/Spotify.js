@@ -6,6 +6,11 @@ class Spotify {
     static spotifyApi = null;
     static tokenExpiresAt = 0;
 
+    static isConfigured() {
+        const { clientId, clientSecret } = config.spotify;
+        return !!clientId && !!clientSecret && clientId !== 'YOUR_SPOTIFY_CLIENT_ID' && clientSecret !== 'YOUR_SPOTIFY_CLIENT_SECRET';
+    }
+
     static async initializeApi() {
         if (!this.spotifyApi) {
             this.spotifyApi = new SpotifyWebApi({
