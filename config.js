@@ -41,7 +41,10 @@ module.exports = {
         maxPlaylistSize: 50,
         status: process.env.STATUS || '🎵 Beatra | /play',
         embedColor: process.env.EMBED_COLOR || '#FF6B6B',
-        defaultSource: (process.env.DEFAULT_SOURCE || '').trim().toLowerCase() === 'tidal' ? 'tidal' : 'youtube', // Default /play source - YouTube unless set to tidal
+        // Default /play and /search source - YouTube unless set to tidal or soundcloud
+        defaultSource: ['tidal', 'soundcloud'].includes((process.env.DEFAULT_SOURCE || '').trim().toLowerCase())
+            ? process.env.DEFAULT_SOURCE.trim().toLowerCase()
+            : 'youtube',
         supportServer: process.env.SUPPORT_SERVER || 'https://discord.gg/ACJQzJuckW',
         website: process.env.WEBSITE || 'https://beatra.app',
         invite: 'https://discord.com/oauth2/authorize?client_id=' + process.env.CLIENT_ID + '&permissions=8&scope=bot%20applications.commands',

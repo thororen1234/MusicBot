@@ -21,8 +21,8 @@
 | 💾 Local Audio Cache | All tracks are pre-downloaded and cached locally to eliminate stream interruptions, network lag, and voice crackling—delivering buffer-free playback even during peak Discord load or ISP throttling. |
 | 🛡️ Resilient Playback | Voice connection watchdog, stream retry logic, idle auto-disconnect, and graceful SIGINT shutdown. |
 | 🧠 Localization | Cached translations via `node-json-db` with runtime language switching and fallback logic. |
-| 📜 Static Lyrics | Fetches lyrics from Genius (web scraping) with LRCLIB fallback—button-only display with pagination support. |
-| ⚙️ Extensible Core | Modular providers (`src/YouTube.js`, `src/Spotify.js`, `src/SoundCloud.js`, `src/DirectLink.js`) let you add more sources quickly. |generation Discord music bot crafted with **discord.js v14**, engineered for cinematic embeds, lossless playback, and frictionless control across desktop and mobile.
+| 📜 Static Lyrics | Tidal tracks use Tidal's own lyrics; everything else comes from Genius (web scraping) with LRCLIB fallback—button-only display with pagination support. |
+| ⚙️ Extensible Core | Modular providers (`src/YouTube.js`, `src/Tidal.js`, `src/SongLink.js`, `src/Spotify.js`, `src/SoundCloud.js`, `src/DirectLink.js`) let you add more sources quickly. |
 
 </div>
 
@@ -30,8 +30,8 @@
 
 ## ✨ Why Beatra?
 
-- **Slash-first UX** – `/play`, `/search`, `/language`, `/nowplaying`, and `/help` respond instantly with localized embeds and live-updating buttons.
-- **Platform polyglot** – Streams from YouTube, Spotify, SoundCloud, or a direct MP3/WAV/OGG link. Spotify albums, playlists, and artist radios turn into fully hydrated queues.
+- **Slash-first UX** – `/play`, `/search`, `/queue`, `/language`, `/nowplaying`, and `/help` respond instantly with localized embeds and live-updating buttons.
+- **Platform polyglot** – Plays YouTube, SoundCloud (tracks, playlists and profiles), direct MP3/WAV/OGG links and (optionally) Tidal. Spotify, Apple Music, Deezer and Tidal links are converted through the SongLink API and play from YouTube—or from Tidal when you pick `source:Tidal`. Searches can use `source:SoundCloud` too.
 - **Adaptive UI** – A two-row control deck (Pause, Skip, Stop, Queue, Shuffle, Volume) stays in sync with the audio engine and locks down expired sessions automatically.
 - **Edge-ready audio core** – Preloads entire queues, heals voice reconnections, and falls back gracefully when Discord or upstream services hiccup.
 - **Global voice** – 21 fully translated language packs shipped out-of-the-box with instant server switching.
@@ -46,16 +46,17 @@
 3. [Prerequisites](#prerequisites)
 4. [Quick Start](#quick-start)
 5. [Configuration](#configuration)
-6. [Spotify API Setup](#spotify-api-setup)
-7. [Genius API Setup (Optional)](#genius-api-setup-optional)
-8. [YT-DLP Cookie Add](#youtube-cookie-setup)
-9. [Sharding for Large Bots (1000+ Servers)](#sharding-for-large-bots-1000-servers)
-10. [Slash Commands & Controls](#slash-commands--controls)
-11. [Language Support](#language-support)
-12. [Deployment Tips](#deployment-tips)
-13. [Troubleshooting](#troubleshooting)
-14. [Privacy & Legal](#privacy--legal)
-15. [Contributing](#contributing)
+6. [Tidal Playback Setup (Optional)](#tidal-playback-setup-optional)
+7. [Spotify API Setup (Optional)](#spotify-api-setup-optional)
+8. [Genius API Setup (Optional)](#genius-api-setup-optional)
+9. [YT-DLP Cookie Add](#youtube-cookie-setup)
+10. [Sharding for Large Bots (1000+ Servers)](#sharding-for-large-bots-1000-servers)
+11. [Slash Commands & Controls](#slash-commands--controls)
+12. [Language Support](#language-support)
+13. [Deployment Tips](#deployment-tips)
+14. [Troubleshooting](#troubleshooting)
+15. [Privacy & Legal](#privacy--legal)
+16. [Contributing](#contributing)
 
 ---
 
@@ -164,8 +165,8 @@ COOKIES_FILE=./cookies.txt
 | `bot.embedColor` | `.env`/`config.js` | Hex color for all embeds. |
 | `bot.supportServer` & `bot.website` | `.env`/`config.js` | Populates help links and README badges. |
 | `songlink.apiUrl` & `songlink.apiKey` | `.env`/`config.js` | SongLink API (Odesli-compatible) used to convert Spotify, Apple Music, Deezer and Tidal links to YouTube. Defaults to `https://songs.thororen.com`. |
-| `tidal.url`, `tidal.username` & `tidal.password` | `.env`/`config.js` | Optional [TidalSubsonic](https://github.com/vMohammad24/TidalSubsonic) server login. Tidal links then play from Tidal, and `/play source:Tidal` searches Tidal and plays Spotify/Apple Music/Deezer links from their Tidal match. |
-| `bot.defaultSource` | `.env` (`DEFAULT_SOURCE`) | `youtube` (default) or `tidal` - the `/play` source used when none is picked. |
+| `tidal.url`, `tidal.username` & `tidal.password` | `.env`/`config.js` | Optional [TidalSubsonic](https://github.com/vMohammad24/TidalSubsonic) server login. See [Tidal Playback Setup](#tidal-playback-setup-optional). |
+| `bot.defaultSource` | `.env` (`DEFAULT_SOURCE`) | `youtube` (default), `tidal` or `soundcloud` - the `/play` and `/search` source used when none is picked. |
 | `spotify.clientId` & `spotify.clientSecret` | `.env`/`config.js` | Optional fallback for Spotify playlist, album and artist links, which SongLink can't convert to YouTube. |
 | `genius.clientId` & `genius.clientSecret` | `.env`/`config.js` | Optional Genius API credentials for higher rate limits (works without via web scraping). |
 | `ytdl.cookiesFromBrowser` & `ytdl.cookiesFile` | `.env`/`config.js` | It is an optional feature to add cookies against YouTube cookie errors. |
@@ -174,7 +175,47 @@ COOKIES_FILE=./cookies.txt
 
 ---
 
-## Spotify API Setup
+## Tidal Playback Setup (Optional)
+
+Beatra can play straight from Tidal through a [TidalSubsonic](https://github.com/vMohammad24/TidalSubsonic) server, which exposes a Tidal account over the Subsonic API. The bot never sees your Tidal credentials—only a Subsonic user on that server.
+
+1. Run a TidalSubsonic server and link your Tidal account to it.
+2. Create a Subsonic user on that server for the bot.
+3. Add the server and that user to your `.env`:
+   ```dotenv
+   TIDAL_SUBSONIC_URL=https://your-tidalsubsonic-server
+   TIDAL_SUBSONIC_USER=subsonic_user
+   TIDAL_SUBSONIC_PASSWORD=subsonic_password
+   # Optional: make Tidal the default source for /play and /search (blank = youtube)
+   DEFAULT_SOURCE=
+   ```
+4. Restart the bot.
+
+What changes once it's set up:
+
+| You queue | Plays from |
+| --- | --- |
+| A Tidal track, album or playlist link | Tidal (any `source`) |
+| `/play <song> source:Tidal` | Tidal, if it has an **exact** match for the song—otherwise YouTube |
+| A Spotify/Apple Music/Deezer link with `source:Tidal` | The exact Tidal match (albums play in full)—otherwise YouTube |
+| `/search <song> source:Tidal` | A pick list of Tidal results (YouTube if Tidal has none) |
+| Anything, while the Tidal server is unreachable | YouTube |
+
+Tidal tracks also get their lyrics from Tidal. "Exact" ignores accents, case, "Remastered" and "feat." tags, but treats versions such as Live, Remix or Radio Edit as different songs unless you asked for them.
+
+### SoundCloud
+
+SoundCloud needs no setup—it is played through yt-dlp.
+
+- SoundCloud track, playlist (`/sets/`) and profile links play from SoundCloud (playlists and profiles load up to 50 tracks, which can take ~30 seconds).
+- `/play <song> source:SoundCloud` and `/search <song> source:SoundCloud` search SoundCloud and fall back to YouTube when nothing is found.
+- Some label tracks are only available on SoundCloud as **30-second previews**. Searches skip them, and preview links or playlist entries play the full song from YouTube instead.
+
+---
+
+## Spotify API Setup (Optional)
+
+Spotify links normally go through the SongLink API and need no credentials. These are only used as a fallback for Spotify **playlist, album and artist** links that SongLink can't turn into YouTube.
 
 1. Visit the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard/), sign in, and click **Create an App**.
 2. Name your integration (e.g., `Beatra Bot`) and enable **Web API**.
@@ -183,7 +224,7 @@ COOKIES_FILE=./cookies.txt
 5. Paste both values into your `.env` (`SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`).
 6. Restart the bot. The credentials are cached and refreshed automatically with the client credentials grant.
 
-Without these credentials Spotify requests fall back to zero results.
+Without these credentials, Spotify song links still work through SongLink; only playlist and artist links (and albums when not using Tidal) can't be played.
 
 ---
 
@@ -219,9 +260,10 @@ Beatra uses **web scraping** by default to fetch lyrics from Genius—no API key
 ### Lyrics Priority
 
 The bot fetches lyrics in this order:
-1. **Genius** (with API key if provided, otherwise web scraping)
-2. **LRCLIB** (free lyrics database)
-3. If both fail, no lyrics button appears
+1. **Tidal** (Tidal tracks only, when Tidal playback is set up)
+2. **Genius** (with API key if provided, otherwise web scraping)
+3. **LRCLIB** (free lyrics database)
+4. If all fail, no lyrics button appears
 
 ---
 
@@ -417,9 +459,10 @@ SHARD_RESPAWN=false
 
 | Command | What it does |
 | --- | --- |
-| `/play <query>` | Smart-detects platform links or search keywords, queues playlists/albums, and spins up the control panel. |
-| `/search <keywords>` | Presents a paginated selection menu of YouTube matches — choose with buttons. |
-| `/nowplaying` | Drops the live embed again, including queue status, repeat/shuffle flags, and volume. |
+| `/play <query> [source]` | Smart-detects platform links or search keywords, queues playlists/albums, and spins up the control panel. `source` (YouTube/Tidal/SoundCloud) picks where searches play from; YouTube/Tidal also apply to Spotify/Apple Music/Deezer links. |
+| `/search <keywords> [source]` | Presents a selection menu of YouTube, Tidal or SoundCloud matches — choose with buttons. |
+| `/queue [page]` | Shows the current song and the upcoming queue, 10 per page, with page buttons. |
+| `/nowplaying` | Drops the live embed again with the full control buttons, including queue status, repeat/shuffle flags, and volume. |
 | `/language` | Opens a flag button wall for instant localization (cached per guild). |
 | `/help` | Gorgeous, localized feature tour + live stats and support links. |
 
@@ -428,7 +471,7 @@ SHARD_RESPAWN=false
 - **⏸️ / ▶️ Pause & Resume** – Auth-limited to DJs, admins, or the original requester.
 - **⏭️ Skip** – Jumps to the next queued item (requires at least 1 upcoming track).
 - **⏹️ Stop** – Clears queue, tears down voice, and locks the panel.
-- **📋 Queue** – Renders the next 10 tracks with real-time progress bar.
+- **📋 Queue** – Shows the queue privately, 10 tracks per page, with page buttons.
 - **🔀 Shuffle** – Randomizes the queue with guard rails (min. 2 tracks).
 - **🔊 Volume** – Opens a modal allowing 0–100 input.
 - **🔁 Loop** – Cycles through loop modes: Off → Track Repeat → Queue Repeat. Track mode replays the current song endlessly; Queue mode restarts the entire queue when finished.
@@ -626,10 +669,11 @@ Add your own by copying `languages/en.json`, translating strings, and restarting
 | Symptom | Fix |
 | --- | --- |
 | Slash commands do not appear | Ensure `CLIENT_ID` is correct and the bot logged in successfully. For new deployments, invite the bot with `applications.commands` scope. |
-| Spotify tracks return nothing | Verify `SPOTIFY_CLIENT_ID`/`SECRET` and that the app is approved for Spotify Web API. |
+| Spotify/Apple Music/Deezer links fail | Check the SongLink API is reachable at `SONGLINK_API_URL`, and set `SONGLINK_API_KEY` if that server requires one. Spotify playlist/artist links also need `SPOTIFY_CLIENT_ID`/`SECRET`. |
+| Tidal links play from YouTube | The bot falls back to YouTube when Tidal can't play a link. Check the console for `[Tidal] ... failed`: a `401` means the `TIDAL_SUBSONIC_USER`/`PASSWORD` login is wrong; a connection error means `TIDAL_SUBSONIC_URL` is unreachable. |
 | Bot joins but plays silence | Confirm the host has outbound UDP open, and the voice channel permissions allow **Connect** and **Speak**. |
 | Buttons stop working mid-song | Interactions expire after Discord's cache TTL or when a new session is generated. Use `/play` again to refresh the deck. |
-| Lyrics button disabled or missing | The bot fetches from Genius first (web scraping or API), then LRCLIB. If both fail, no lyrics button appears. Check console for fetch errors. |
+| Lyrics button disabled or missing | The bot fetches from Tidal (Tidal tracks only), then Genius (web scraping or API), then LRCLIB. If all fail, no lyrics button appears. Check console for fetch errors. |
 | Command language incorrect | Run `/language`, select your flag, and ensure `database/languages.json` is writable. |
 | **YouTube bot detection error** | **YouTube requires bot verification via cookies. See [YouTube Cookie Setup](#youtube-cookie-setup) below for detailed instructions.** |
 

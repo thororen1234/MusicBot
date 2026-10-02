@@ -118,6 +118,17 @@ class Tidal {
         return results.find(track => isExactQueryMatch(query, track)) || null;
     }
 
+    // Plain-text lyrics for a Tidal track ID, or null. Synced (LRC) lyrics have their timestamps stripped.
+    static async getLyrics(id) {
+        const data = await this.request('getLyrics', { id: String(id) });
+        const text = (data.lyrics?.value || '')
+            .split('\n')
+            .map(line => line.replace(/^(\[\d+:\d+(?:[.:]\d+)?\])+\s*/, '').trimEnd())
+            .join('\n')
+            .trim();
+        return text || null;
+    }
+
     static formatTrack(song) {
         return {
             title: song.title || 'Unknown Title',

@@ -10,7 +10,6 @@ const {
 const { EmbedBuilder } = require('discord.js');
 const config = require('../config');
 const YouTube = require('./YouTube');
-const Spotify = require('./Spotify');
 const SoundCloud = require('./SoundCloud');
 const DirectLink = require('./DirectLink');
 const Tidal = require('./Tidal');
@@ -450,103 +449,17 @@ class MusicPlayer {
         this.connection = null;
     }
 
-    async addTrack(query, requestedBy, platform = 'auto') {
-        try {
-            let tracks = [];
-
-            // Determine platform and get track info
-            if (platform === 'auto') {
-                platform = this.detectPlatform(query);
-            }
-
-            switch (platform) {
-                case 'youtube':
-                    tracks = await YouTube.search(query, 1, this.guild.id);
-                    break;
-                case 'spotify':
-                    // Check if it's a Spotify URL for consistency
-                    if (Spotify.isSpotifyURL(query)) {
-                        tracks = await Spotify.getFromURL(query, this.guild.id);
-                    } else {
-                        tracks = await Spotify.search(query, 1, 'track', this.guild.id);
-                    }
-                    break;
-                case 'soundcloud':
-                    tracks = await SoundCloud.search(query, 1, this.guild.id);
-                    break;
-                case 'direct':
-                    tracks = await DirectLink.getInfo(query);
-                    break;
-                default:
-                    // Default to YouTube search
-                    tracks = await YouTube.search(query, 1, this.guild.id);
-            }
-
-            if (!tracks || tracks.length === 0) {
-                const errorMsg = await LanguageManager.getTranslation(this.guild.id, 'musicplayer.no_results_found');
-                return { success: false, message: errorMsg };
-            }
-
-            // Add tracks to queue
-            const addedTracks = [];
-            const wasIdle = !this.currentTrack; // Remember state BEFORE modification
-
-            for (const track of tracks.slice(0, config.bot.maxPlaylistSize)) {
-                track.requestedBy = requestedBy;
-                track.addedAt = Date.now();
-
-                if (this.currentTrack) {
-                    this.queue.push(track);
-                } else {
-                    this.currentTrack = track;
-                }
-                addedTracks.push(track);
-            }
-
-            // Immediately preload ALL newly added tracks (before playing)
-            for (const track of addedTracks) {
-                // Skip the first track ONLY if player was idle and this track will start playing immediately
-                const isAboutToPlay = wasIdle && track === addedTracks[0];
-                if (!isAboutToPlay && !this.preloadedStreams.has(track.url)) {
-                    this.preloadTrack(track).catch(err => {
-                        if (err && err.message) {
-                            console.error(`❌ Preload error for ${track.title}:`, err.message);
-                        }
-                    });
-                }
-            }
-
-            // Auto-play if not currently playing
-            if (wasIdle) {
-                // Player was idle, start playing the first added track from beginning
-                if (addedTracks.length > 0) {
-                    this.currentTrack = addedTracks[0];
-                    await this.play(null, 0);
-                }
-            } else if (this.audioPlayer.state && this.audioPlayer.state.status === AudioPlayerStatus.Idle) {
-                // Player exists but is idle (finished playing) - start next from queue
-                await this.play(null, 0);
-            }
-
-            const result = {
-                success: true,
-                tracks: addedTracks,
-                isPlaylist: tracks.length > 1,
-                position: this.queue.length
-            };
-
-            await this.persistState('queue-update');
-            return result;
-
-        } catch (error) {
-            const errorMsg = await LanguageManager.getTranslation(this.guild.id, 'musicplayer.error_adding_track');
-            return { success: false, message: errorMsg };
-        }
+    /**
+     * Tracks whose audio comes from a YouTube equivalent: Spotify tracks, and SoundCloud
+     * tracks that SoundCloud only offers as a 30 second preview.
+     */
+    playsViaYouTube(track) {
+        return track.platform === 'spotify' || (track.platform === 'soundcloud' && track.preview);
     }
 
     /**
      * Downloads audio stream to a local file
-     * Works with YouTube, Spotify, SoundCloud, and DirectLink
+     * Works with YouTube, Spotify (via YouTube), SoundCloud, DirectLink and Tidal
      */
     async downloadTrack(track, streamUrl, streamInfo) {
         // Generate unique filename based on URL to enable caching
@@ -591,20 +504,17 @@ class MusicPlayer {
             // Mark as downloading
             this.downloadingFiles.add(filepath);
 
-            // For Spotify and SoundCloud - we need to use the YouTube URL
-            // These platforms have DRM protection and can't be downloaded directly
+            // Spotify (DRM) and SoundCloud previews can't be downloaded in full - use the YouTube equivalent.
+            // Full SoundCloud tracks are downloaded straight from SoundCloud by yt-dlp below.
             let downloadUrl = track.url;
             
-            if (track.platform === 'spotify' || track.platform === 'soundcloud') {
-                // For Spotify/SoundCloud, we must use the YouTube equivalent
+            if (this.playsViaYouTube(track)) {
                 if (track.youtubeUrl) {
                     downloadUrl = track.youtubeUrl;
                 } else {
                     // Search YouTube and use that URL
                     const YouTube = require('./YouTube');
-                    const query = track.platform === 'spotify' 
-                        ? `${track.title} ${track.artist}`
-                        : track.title;
+                    const query = `${track.title} ${track.artist}`;
                     
                     const results = await YouTube.search(query, 1, this.guild?.id);
                     if (results && results.length > 0) {
@@ -774,7 +684,8 @@ class MusicPlayer {
 
             if (!streamInfo) {
                 // Get stream normally
-                switch (this.currentTrack.platform) {
+                // SoundCloud previews play the full song from YouTube, the same way Spotify tracks do
+                switch (this.playsViaYouTube(this.currentTrack) ? 'spotify' : this.currentTrack.platform) {
                     case 'youtube':
                         streamInfo = await YouTube.getStream(streamUrl, this.guild.id, resumeFromSeconds);
                         break;
@@ -1758,20 +1669,6 @@ class MusicPlayer {
         }
     }
 
-    detectPlatform(query) {
-
-        if (query.includes('youtube.com') || query.includes('youtu.be')) {
-            return 'youtube';
-        } else if (query.includes('spotify.com')) {
-            return 'spotify';
-        } else if (query.includes('soundcloud.com')) {
-            return 'soundcloud';
-        } else if (query.match(/^https?:\/\/.*\.(mp3|wav|ogg|flac|m4a|aac|wma|opus|webm|mp4)$/i)) {
-            return 'direct';
-        }
-        return 'youtube'; // Default to YouTube search
-    }
-
     // Preloading System
     async preloadTrack(track) {
         if (!track || !track.url) return;
@@ -1801,7 +1698,7 @@ class MusicPlayer {
             let streamInfo;
 
             // Get stream URL first
-            switch (track.platform) {
+            switch (this.playsViaYouTube(track) ? 'spotify' : track.platform) {
                 case 'youtube':
                     streamInfo = await YouTube.getStream(streamUrl, this.guild.id);
                     break;
@@ -1822,7 +1719,8 @@ class MusicPlayer {
                     }
                     break;
                 case 'soundcloud':
-                    streamInfo = await SoundCloud.getStream(streamUrl, this.guild.id);
+                    // Only preload tracks with a direct stream; HLS-only tracks are piped through yt-dlp at play time
+                    streamInfo = await SoundCloud.getStream(streamUrl, this.guild.id, 0, { allowPipe: false });
                     break;
                 case 'direct':
                     streamInfo = await DirectLink.getStream(streamUrl);
@@ -1919,6 +1817,7 @@ class MusicPlayer {
             platform: track.platform || null,
             uploader: track.uploader || null,
             youtubeUrl: track.youtubeUrl || null,
+            preview: track.preview || false,
             soundcloudUrl: track.soundcloudUrl || null,
             spotifyUrl: track.spotifyUrl || null,
             isLive: track.isLive || track.live || false,
@@ -1943,6 +1842,7 @@ class MusicPlayer {
             platform: data.platform || null,
             uploader: data.uploader || null,
             youtubeUrl: data.youtubeUrl || null,
+            preview: Boolean(data.preview),
             soundcloudUrl: data.soundcloudUrl || null,
             spotifyUrl: data.spotifyUrl || null,
             isLive: Boolean(data.isLive),

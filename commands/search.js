@@ -1,16 +1,27 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits } = require('discord.js');
 const config = require('../config.js');
 const YouTube = require('../src/YouTube.js');
+const Tidal = require('../src/Tidal');
+const SoundCloud = require('../src/SoundCloud');
 const LanguageManager = require('../src/LanguageManager');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('search')
-        .setDescription('Search and select music on YouTube')
+        .setDescription('Search and select music on YouTube, Tidal or SoundCloud')
         .addStringOption(option =>
             option.setName('query')
                 .setDescription('Music name or artist to search')
                 .setRequired(true)
+        )
+        .addStringOption(option =>
+            option.setName('source')
+                .setDescription('Where to search')
+                .addChoices(
+                    { name: 'YouTube', value: 'youtube' },
+                    { name: 'Tidal', value: 'tidal' },
+                    { name: 'SoundCloud', value: 'soundcloud' }
+                )
         ),
 
     async execute(interaction) {
@@ -31,8 +42,32 @@ module.exports = {
                 });
             }
 
-            // Arama yap
-            const results = await YouTube.search(query, 9, guildId);
+            const source = interaction.options.getString('source') || config.bot.defaultSource;
+            if (source === 'tidal' && !Tidal.isConfigured()) {
+                return await interaction.editReply({
+                    content: await LanguageManager.getTranslation(guildId, 'tidal.not_configured')
+                });
+            }
+
+            // Tidal when chosen, falling back to YouTube if Tidal has nothing or is unreachable
+            let results = [];
+            if (source === 'tidal') {
+                try {
+                    results = await Tidal.search(query, 9);
+                } catch (error) {
+                    console.error(error.message);
+                }
+            }
+            if (source === 'soundcloud') {
+                try {
+                    results = await SoundCloud.search(query, 9);
+                } catch (error) {
+                    console.error('[SoundCloud] search failed:', error.message);
+                }
+            }
+            if (results.length === 0) {
+                results = await YouTube.search(query, 9, guildId);
+            }
 
             if (!results || results.length === 0) {
                 const noResultsMsg = await LanguageManager.getTranslation(guildId, 'commands.search.no_results');
@@ -107,8 +142,9 @@ module.exports = {
                 duration
             });
 
+            const platformIcon = { tidal: '⚫ ', soundcloud: '🟠 ' }[result.platform] || '';
             embed.addFields({
-                name: `${index + 1}. ${title}`,
+                name: `${index + 1}. ${platformIcon}${title}`,
                 value,
                 inline: false
             });

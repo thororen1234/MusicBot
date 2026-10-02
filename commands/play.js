@@ -19,7 +19,8 @@ module.exports = {
                 .setDescription('Where to play searches and Spotify/Apple Music/Deezer links from')
                 .addChoices(
                     { name: 'YouTube', value: 'youtube' },
-                    { name: 'Tidal', value: 'tidal' }
+                    { name: 'Tidal', value: 'tidal' },
+                    { name: 'SoundCloud', value: 'soundcloud' }
                 )
         ),
 
@@ -157,6 +158,14 @@ module.exports = {
                             console.error(error.message);
                         }
                     }
+                    if (source === 'soundcloud') {
+                        // Top full-length SoundCloud result (previews are skipped), otherwise search YouTube
+                        try {
+                            tracks = await SoundCloud.search(query, 1);
+                        } catch (error) {
+                            console.error('[SoundCloud] search failed:', error.message);
+                        }
+                    }
                     if (tracks.length === 0) {
                         tracks = await YouTube.search(query, 1, guildId);
                     }
@@ -215,8 +224,8 @@ module.exports = {
                 }
 
                 case 'soundcloud':
-                    const soundcloudData = await SoundCloud.search(query, 1, guildId);
-                    tracks = soundcloudData || [];
+                    // Track, playlist (/sets/) or profile link
+                    ({ tracks, isPlaylist } = await SoundCloud.getFromURL(query));
                     break;
 
                 case 'direct':
@@ -249,6 +258,7 @@ module.exports = {
     detectPlatform(query) {
         const SongLink = require('../src/SongLink');
         const Tidal = require('../src/Tidal');
+        const SoundCloud = require('../src/SoundCloud');
 
         if (query.includes('youtube.com') || query.includes('youtu.be')) {
             return 'youtube';
@@ -256,7 +266,7 @@ module.exports = {
             return 'tidal';
         } else if (SongLink.isSupportedURL(query)) {
             return 'songlink';
-        } else if (query.includes('soundcloud.com')) {
+        } else if (SoundCloud.isSoundCloudURL(query)) {
             return 'soundcloud';
         } else if (query.startsWith('http') && (query.includes('.mp3') || query.includes('.wav') || query.includes('.ogg'))) {
             return 'direct';

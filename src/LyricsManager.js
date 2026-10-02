@@ -1,6 +1,7 @@
 const axios = require('axios');
 const Genius = require('genius-lyrics');
 const config = require('../config');
+const Tidal = require('./Tidal');
 
 class LyricsManager {
     constructor() {
@@ -71,7 +72,7 @@ class LyricsManager {
     }
 
     /**
-     * Fetch lyrics - first from Genius, fallback to LRCLIB
+     * Fetch lyrics - Tidal tracks use Tidal's own lyrics first, then Genius, then LRCLIB
      * @param {Object} track - Track object with title and artist
      * @returns {Promise<Object|null>} Lyrics object or null
      */
@@ -84,7 +85,16 @@ class LyricsManager {
             return this.cache.get(cacheKey);
         }
 
-        // Try Genius first
+        // Tidal tracks: use Tidal's lyrics for that exact track
+        if (track.platform === 'tidal') {
+            const tidalResult = await this.fetchFromTidal(track);
+            if (tidalResult && tidalResult.plain) {
+                this.storeInCache(cacheKey, tidalResult);
+                return tidalResult;
+            }
+        }
+
+        // Try Genius
         const geniusResult = await this.fetchFromGenius(track);
         if (geniusResult && geniusResult.plain) {
             this.storeInCache(cacheKey, geniusResult);
@@ -106,6 +116,17 @@ class LyricsManager {
 
 
 
+
+    async fetchFromTidal(track) {
+        if (!Tidal.isConfigured() || !track.id) return null;
+        try {
+            const plain = await Tidal.getLyrics(track.id);
+            return plain ? this.buildLyricsData(track, { plain, source: 'Tidal' }) : null;
+        } catch (error) {
+            console.error('❌ Failed to fetch lyrics from Tidal:', error.message);
+            return null;
+        }
+    }
 
     async fetchFromLrclib(track) {
         try {
