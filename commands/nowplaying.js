@@ -174,11 +174,27 @@ module.exports = {
                 embed.setThumbnail(track.thumbnail);
             }
 
-          
+            const components = client.musicEmbedManager
+                ? await client.musicEmbedManager.createControlButtons(player)
+                : [];
 
             await interaction.reply({
-                embeds: [embed]
+                embeds: [embed],
+                components
             });
+
+            // Make this message the live player controller so button states (pause/resume, loop, ...) stay in sync;
+            // the old controller loses its buttons so there is only one set of controls in chat
+            if (components.length > 0) {
+                const message = await interaction.fetchReply().catch(() => null);
+                if (message) {
+                    const previousMessage = player.nowPlayingMessage;
+                    player.nowPlayingMessage = message;
+                    if (previousMessage && previousMessage.id !== message.id) {
+                        previousMessage.edit({ components: [] }).catch(() => {});
+                    }
+                }
+            }
 
         } catch (error) {
             const guildId = interaction.guild.id;

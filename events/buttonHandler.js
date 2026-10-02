@@ -23,6 +23,12 @@ module.exports = {
             return await languageCommand.handleLanguageButton(interaction);
         }
 
+        // Queue pagination buttons (read-only, doesn't require voice channel)
+        if (interaction.customId.startsWith('queue_page:')) {
+            const queueCommand = require('../commands/queue.js');
+            return await queueCommand.handlePageButton(interaction);
+        }
+
         // Help refresh button (doesn't require voice channel)
         if (interaction.customId === 'help_refresh') {
             return await this.handleHelpRefresh(interaction);
@@ -337,58 +343,17 @@ module.exports = {
     },
 
     async handleQueue(interaction, player) {
-        const queueInfo = player.getQueue();
+        const queueCommand = require('../commands/queue.js');
 
-        if (!queueInfo.current && queueInfo.queue.length === 0) {
+        if (!queueCommand.hasTracks(player)) {
             return await interaction.reply({
                 content: await LanguageManager.getTranslation(interaction.guild?.id, 'buttonhandler.no_songs_in_queue'),
                 flags: [1 << 6]
             });
         }
 
-        const queueTitle = await LanguageManager.getTranslation(interaction.guild?.id, 'buttonhandler.play_queue_title');
-        const embed = new EmbedBuilder()
-            .setTitle(queueTitle)
-            .setColor(config.bot.embedColor)
-            .setTimestamp();
-
-        // Current track
-        if (queueInfo.current) {
-            const currentTime = player.getCurrentTime ? player.getCurrentTime() : 0;
-            const progress = this.createProgressBar(currentTime, queueInfo.current.duration);
-
-            embed.addFields({
-                name: await LanguageManager.getTranslation(interaction.guild?.id, 'buttonhandler.now_playing'),
-                value: `**[${queueInfo.current.title}](${queueInfo.current.url})**\n${progress}`,
-                inline: false
-            });
-        }
-
-        // Queue tracks
-        if (queueInfo.queue.length > 0) {
-            let queueText = '';
-            const tracks = queueInfo.queue.slice(0, 10); // Show first 10
-
-            tracks.forEach((track, index) => {
-                queueText += `\`${index + 1}.\` **[${track.title}](${track.url})**\n`;
-            });
-
-            if (queueInfo.queue.length > 10) {
-                queueText += `\n*${await LanguageManager.getTranslation(interaction.guild?.id, 'buttonhandler.and_more', { count: queueInfo.queue.length - 10 })}*`;
-            }
-
-            embed.addFields({
-                name: await LanguageManager.getTranslation(interaction.guild?.id, 'buttonhandler.upcoming_songs', { count: queueInfo.queue.length }),
-                value: queueText,
-                inline: false
-            });
-        }
-
-        embed.setFooter({
-            text: await LanguageManager.getTranslation(interaction.guild?.id, 'buttonhandler.total_songs', { count: queueInfo.queue.length + (queueInfo.current ? 1 : 0) })
-        });
-
-        await interaction.reply({ embeds: [embed], flags: [1 << 6] });
+        const queueMessage = await queueCommand.buildQueueMessage(player, interaction.guild.id);
+        await interaction.reply({ ...queueMessage, flags: [1 << 6] });
     },
 
     async handleShuffle(interaction, player, requesterId) {

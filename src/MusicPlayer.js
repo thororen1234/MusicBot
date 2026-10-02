@@ -307,10 +307,17 @@ class MusicPlayer {
     }
 
     async forceReconnect() {
+        // Skip if a previous attempt is still waiting for Ready
+        if (this.isReconnecting) return false;
+        this.isReconnecting = true;
+
         try {
-            // Destroy old connection
+            // Destroy old connection (it may already be destroyed, e.g. when recovery was triggered by the Destroyed event)
             if (this.connection) {
-                this.connection.destroy();
+                this.connection.removeAllListeners();
+                if (this.connection.state.status !== VoiceConnectionStatus.Destroyed) {
+                    this.connection.destroy();
+                }
             }
 
             // Create new connection
@@ -332,6 +339,8 @@ class MusicPlayer {
         } catch (error) {
             console.error('❌ Force reconnect failed:', error);
             return false;
+        } finally {
+            this.isReconnecting = false;
         }
     }
 
@@ -2346,7 +2355,7 @@ class MusicPlayer {
             this.audioPlayer.stop();
         }
 
-        if (this.connection) {
+        if (this.connection && this.connection.state.status !== VoiceConnectionStatus.Destroyed) {
             this.connection.destroy();
         }
     }
