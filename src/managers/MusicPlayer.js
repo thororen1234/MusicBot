@@ -17,6 +17,7 @@ const ExternalSources = require('../providers/ExternalSources');
 const FloweryTTS = require('../providers/FloweryTTS');
 const SpeechTTS = require('../providers/SpeechTTS');
 const StreamDeckAudio = require('../providers/StreamDeckAudio');
+const UploadedFile = require('../providers/UploadedFile');
 const LanguageManager = require('./LanguageManager');
 const ErrorHandler = require('../utils/ErrorHandler');
 const PlayerStateManager = require('./PlayerStateManager');
@@ -754,6 +755,10 @@ class MusicPlayer {
 
                     case 'streamdeck':
                         streamInfo = await StreamDeckAudio.getStream(streamUrl);
+                        break;
+
+                    case 'upload':
+                        streamInfo = await UploadedFile.getStream(this.currentTrack);
                         break;
 
                     default:
@@ -1756,6 +1761,9 @@ class MusicPlayer {
                     streamInfo = await SpeechTTS.getStream(track);
                     break;
                 // Stream Deck streams are deliberately not preloaded: the decoded stream is single-use.
+                case 'upload':
+                    streamInfo = await UploadedFile.getStream(track);
+                    break;
             }
 
             if (streamInfo) {

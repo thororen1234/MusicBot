@@ -73,7 +73,11 @@ class FloweryTTS {
             responseType: 'stream',
             timeout: 30000,
         });
-        return response.data;
+        return {
+            stream: response.data,
+            duration: track.duration || 0,
+            canSeek: false,
+        };
     }
 }
 

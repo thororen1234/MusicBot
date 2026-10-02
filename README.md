@@ -188,7 +188,11 @@ Set `DISABLED_PROVIDERS` to a comma-separated list and restart the bot. Disabled
 DISABLED_PROVIDERS=tiktok,reddit,pornhub,flowerytts
 ```
 
-Available IDs: `youtube`, `soundcloud`, `tidal`, `spotify`, `applemusic`, `deezer`, `yandex`, `vk`, `qobuz`, `jiosaavn`, `mixcloud`, `ocremix`, `clypit`, `reddit`, `getyarn`, `tiktok`, `soundgasm`, `pixeldrain`, `tumblr`, `pornhub`, `flowerytts`, `speechtts`, `streamdeck`, and `direct`.
+Available IDs: `youtube`, `soundcloud`, `tidal`, `spotify`, `applemusic`, `deezer`, `yandex`, `vk`, `qobuz`, `jiosaavn`, `mixcloud`, `ocremix`, `clypit`, `reddit`, `getyarn`, `tiktok`, `soundgasm`, `pixeldrain`, `tumblr`, `pornhub`, `flowerytts`, `speechtts`, `streamdeck`, `upload`, and `direct`.
+
+### Uploaded files
+
+Use the `/play` command's optional **file** attachment to play an audio or video upload directly from Discord. Provide either a query/URL or an attachment. Uploaded media is transcoded and cached like other tracks; the default 25 MB limit is configurable with `MAX_UPLOAD_SIZE_MB`. Add `upload` to `DISABLED_PROVIDERS` to turn this feature off.
 
 ---
 
@@ -243,7 +247,7 @@ Flowery TTS is available without a music URL:
 /play ftts://Hello?voice=your_voice&speed=1.2
 ```
 
-`tts:Hello from Beatra` is also accepted. Configure a default voice and audio options with the `FLOWERY_TTS_*` environment variables in `.env.example`.
+`tts:Hello from Beatra` is also accepted. Flowery uses the `Andrew` voice by default; override it and configure audio options with the `FLOWERY_TTS_*` environment variables in `.env.example`.
 
 `/play` also recognises Mixcloud, OC Remix URLs (or an `OCR12345` identifier), Clyp.it, Reddit, getyarn, TikTok, Soundgasm, Pixeldrain, and Tumblr URLs through yt-dlp. `.streamDeckAudio` files are decoded as Stream Deck audio. Google Translate speech uses the plugin-compatible form `/play speak:Hello world`; set `GOOGLE_TTS_LANGUAGE` to change its language/accent.
 

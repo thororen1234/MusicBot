@@ -8,11 +8,16 @@ const ErrorHandler = require('../utils/ErrorHandler');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('play')
-        .setDescription('Plays music from YouTube, supported services, TTS, or direct links')
+        .setDescription('Plays music from a query, supported link, or uploaded file')
         .addStringOption(option =>
             option.setName('query')
-                .setDescription('Song, supported URL, ftts://text, or direct audio link')
-                .setRequired(true)
+            .setDescription('Song, supported URL, ftts://text, or direct audio link')
+                .setRequired(false)
+        )
+        .addAttachmentOption(option =>
+            option.setName('file')
+                .setDescription('An audio or video file to play')
+                .setRequired(false)
         )
         .addStringOption(option =>
             option.setName('source')
@@ -31,7 +36,9 @@ module.exports = {
                 await interaction.deferReply();
             }
 
-            const query = interaction.options.getString('query');
+            const attachment = interaction.options.getAttachment('file');
+            const queryInput = interaction.options.getString('query');
+            const query = queryInput || attachment?.name;
             const member = interaction.member;
             const guild = interaction.guild;
             const channel = interaction.channel;
@@ -42,6 +49,12 @@ module.exports = {
                 return await interaction.editReply({
                     content: validationResult.message
                 });
+            }
+            if (!query) {
+                return await interaction.editReply({ content: '❌ Provide a song or URL, or attach an audio/video file.' });
+            }
+            if (attachment && queryInput) {
+                return await interaction.editReply({ content: '❌ Provide either a query/URL or a file attachment, not both.' });
             }
 
             // Music player al veya oluştur
@@ -66,7 +79,7 @@ module.exports = {
 
             // Sadece müzik verilerini al (player'a ekleme yapma)
             const source = interaction.options.getString('source') || config.bot.defaultSource;
-            const trackData = await this.getTrackData(query, guild.id, source);
+            const trackData = await this.getTrackData(query, guild.id, source, attachment);
 
             if (!trackData.success) {
                 return await interaction.editReply({
@@ -133,7 +146,7 @@ module.exports = {
         return { success: true };
     },
 
-    async getTrackData(query, guildId, source = 'youtube') {
+    async getTrackData(query, guildId, source = 'youtube', attachment = null) {
         const YouTube = require('../providers/YouTube');
         const Spotify = require('../providers/Spotify');
         const SongLink = require('../providers/SongLink');
@@ -144,10 +157,18 @@ module.exports = {
         const FloweryTTS = require('../providers/FloweryTTS');
         const SpeechTTS = require('../providers/SpeechTTS');
         const StreamDeckAudio = require('../providers/StreamDeckAudio');
+        const UploadedFile = require('../providers/UploadedFile');
 
         try {
             let tracks = [];
             let isPlaylist = false;
+
+            if (attachment) {
+                if (!UploadedFile.isEnabled()) {
+                    return { success: false, message: this.getProviderDisabledMessage('upload') };
+                }
+                return { success: true, isPlaylist: false, tracks: [UploadedFile.getTrack(attachment)] };
+            }
 
             if (source === 'tidal' && !config.providers.isEnabled('tidal')) {
                 return { success: false, message: this.getProviderDisabledMessage('tidal') };
@@ -335,6 +356,7 @@ module.exports = {
             flowerytts: 'flowerytts',
             speechtts: 'speechtts',
             streamdeck: 'streamdeck',
+            upload: 'upload',
         };
         if (platform === 'songlink') return SongLink.getProviderId(query);
         if (platform === 'external') return ExternalSources.getSource(query)?.id || null;

@@ -32,7 +32,7 @@ module.exports = {
     // Flowery TTS (https://flowery.pw/docs) used with /play ftts://Your text
     floweryTts: {
         apiUrl: (process.env.FLOWERY_TTS_API_URL || 'https://api.flowery.pw/v1/tts').replace(/\/+$/, ''),
-        voice: process.env.FLOWERY_TTS_VOICE || '',
+        voice: process.env.FLOWERY_TTS_VOICE || 'Andrew',
         translate: process.env.FLOWERY_TTS_TRANSLATE === 'true',
         silence: Math.max(0, Math.min(10000, Number.parseInt(process.env.FLOWERY_TTS_SILENCE || '0', 10) || 0)),
         speed: Math.max(0.5, Math.min(10, Number.parseFloat(process.env.FLOWERY_TTS_SPEED || '1') || 1)),
@@ -42,6 +42,13 @@ module.exports = {
     // Google Translate TTS used with /play speak:Your text
     speechTts: {
         language: process.env.GOOGLE_TTS_LANGUAGE || 'en-AU',
+    },
+
+    uploads: {
+        maxMegabytes: Math.max(1, Number.parseInt(process.env.MAX_UPLOAD_SIZE_MB || '25', 10) || 25),
+        get maxBytes() {
+            return this.maxMegabytes * 1024 * 1024;
+        },
     },
 
     // Disable one or more providers with DISABLED_PROVIDERS, e.g. tiktok,reddit,pornhub.
@@ -56,7 +63,7 @@ module.exports = {
                 getyarn: 'getyarn', jiosaavn: 'JioSaavn', ocremix: 'OC Remix',
                 pornhub: 'Pornhub', qobuz: 'Qobuz', soundgasm: 'Soundgasm',
                 soundcloud: 'SoundCloud', speechtts: 'Google TTS',
-                streamdeck: 'Stream Deck audio', tiktok: 'TikTok', vk: 'VK Music',
+                streamdeck: 'Stream Deck audio', tiktok: 'TikTok', upload: 'File uploads', vk: 'VK Music',
                 yandex: 'Yandex Music',
             };
             const normalized = String(provider || '').trim().toLowerCase();
