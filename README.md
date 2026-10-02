@@ -64,13 +64,18 @@
 
 ```
 discord-musicbot/
-├── commands/           # Slash command handlers (play, help, search, language, ...)
-├── events/             # Button & modal controllers for playback UI
-├── src/                # Core services: MusicPlayer, MusicEmbedManager, providers
+├── src/
+│   ├── commands/       # Slash command handlers (play, help, search, language, ...)
+│   ├── events/         # Button & modal controllers for playback UI
+│   ├── loaders/        # Slash-command registration
+│   ├── managers/       # Playback, embeds, language, lyrics, and persisted state
+│   ├── providers/      # YouTube, Spotify, Tidal, SoundCloud, and link sources
+│   ├── utils/          # Shared matching and error helpers
+│   ├── config.js       # Central configuration + env fallbacks
+│   ├── index.js        # Bot bootstrap, client wiring, voice auto-cleanup
+│   └── ...             # Core services: MusicPlayer, MusicEmbedManager, providers
 ├── languages/          # 21 JSON language packs
 ├── database/           # node-json-db store for guild language preferences
-├── config.js           # Central configuration + env fallbacks
-├── index.js            # Bot bootstrap, client wiring, voice auto-cleanup
 ├── LICENSE             # MIT License
 ├── PRIVACY_POLICY.md   # Data handling details
 └── TERMS_OF_SERVICE.md # Acceptable use guidelines
@@ -95,12 +100,13 @@ discord-musicbot/
 
 ```powershell
 # Run from the repo root
-.\setup.bat
-# Edit the generated .env with your credentials
-.\start.bat
+pnpm install
+Copy-Item .env.example .env
+# Edit .env with your credentials
+pnpm start
 ```
 
-`setup.bat` verifies Node.js/npm, installs dependencies, and scaffolds a `.env` template if you don’t have one yet. `start.bat` makes sure your environment is ready and launches the bot via `npm run start`.
+The bot reads its credentials from `.env`; keep that file out of source control.
 
 ### Cross-platform manual steps
 
@@ -110,16 +116,14 @@ git clone https://github.com/umutxyp/musicbot.git discord-musicbot
 cd discord-musicbot
 
 # 2. Install dependencies
-npm install
+pnpm install
 
 # 3. Configure secrets (see below)
 Copy-Item .env .env.backup -ErrorAction SilentlyContinue
 # Edit .env with your token, client ID, Spotify credentials, etc.
 
 # 4. Boot the bot
-npm run start
-# or
-node index.js
+pnpm start
 ```
 
 Slash commands register automatically when the bot starts. Guild-scoped deployment executes within seconds if `GUILD_ID` is provided; global rollout can take up to an hour per Discord caching rules.
@@ -128,7 +132,7 @@ Slash commands register automatically when the bot starts. Guild-scoped deployme
 
 ## Configuration
 
-Beatra reads from both `config.js` defaults and environment variables via `.env`. Update whichever approach fits your hosting workflow.
+Beatra reads from both `src/config.js` defaults and environment variables via `.env`. Update whichever approach fits your hosting workflow.
 
 ### `.env` Cheat Sheet
 
@@ -161,15 +165,15 @@ COOKIES_FILE=./cookies.txt
 | `discord.token` | `.env` → `config.discord.token` | Discord bot token used for login and REST registration. |
 | `discord.clientId` | `.env` → `config.discord.clientId` | Application ID required to register slash commands. |
 | `discord.guildId` | `.env` → `config.discord.guildId` | Optional testing guild ID for <1 minute command deployment. Leave blank for global registration. |
-| `bot.status` | `.env`/`config.js` | Activity text shown as "Listening to ...". |
-| `bot.embedColor` | `.env`/`config.js` | Hex color for all embeds. |
-| `bot.supportServer` & `bot.website` | `.env`/`config.js` | Populates help links and README badges. |
-| `songlink.apiUrl` & `songlink.apiKey` | `.env`/`config.js` | SongLink API (Odesli-compatible) used to convert Spotify, Apple Music, Deezer and Tidal links to YouTube. Defaults to `https://songs.thororen.com`. |
-| `tidal.url`, `tidal.username` & `tidal.password` | `.env`/`config.js` | Optional [TidalSubsonic](https://github.com/vMohammad24/TidalSubsonic) server login. See [Tidal Playback Setup](#tidal-playback-setup-optional). |
+| `bot.status` | `.env`/`src/config.js` | Activity text shown as "Listening to ...". |
+| `bot.embedColor` | `.env`/`src/config.js` | Hex color for all embeds. |
+| `bot.supportServer` & `bot.website` | `.env`/`src/config.js` | Populates help links and README badges. |
+| `songlink.apiUrl` & `songlink.apiKey` | `.env`/`src/config.js` | SongLink API (Odesli-compatible) used to convert Spotify, Apple Music, Deezer and Tidal links to YouTube. Defaults to `https://songs.thororen.com`. |
+| `tidal.url`, `tidal.username` & `tidal.password` | `.env`/`src/config.js` | Optional [TidalSubsonic](https://github.com/vMohammad24/TidalSubsonic) server login. See [Tidal Playback Setup](#tidal-playback-setup-optional). |
 | `bot.defaultSource` | `.env` (`DEFAULT_SOURCE`) | `youtube` (default), `tidal` or `soundcloud` - the `/play` and `/search` source used when none is picked. |
-| `spotify.clientId` & `spotify.clientSecret` | `.env`/`config.js` | Optional fallback for Spotify playlist, album and artist links, which SongLink can't convert to YouTube. |
-| `genius.clientId` & `genius.clientSecret` | `.env`/`config.js` | Optional Genius API credentials for higher rate limits (works without via web scraping). |
-| `ytdl.cookiesFromBrowser` & `ytdl.cookiesFile` | `.env`/`config.js` | It is an optional feature to add cookies against YouTube cookie errors. |
+| `spotify.clientId` & `spotify.clientSecret` | `.env`/`src/config.js` | Optional fallback for Spotify playlist, album and artist links, which SongLink can't convert to YouTube. |
+| `genius.clientId` & `genius.clientSecret` | `.env`/`src/config.js` | Optional Genius API credentials for higher rate limits (works without via web scraping). |
+| `ytdl.cookiesFromBrowser` & `ytdl.cookiesFile` | `.env`/`src/config.js` | It is an optional feature to add cookies against YouTube cookie errors. |
 
 > 🔐 Never commit `.env` to source control. Use deployment secrets in your hosting provider or create environment variables at runtime.
 
@@ -345,27 +349,19 @@ Discord automatically routes events to the correct shard based on server ID.
 
 ### 🚀 Quick Start with Sharding
 
-#### Option 1: Interactive Launcher (Recommended)
+#### Sharded mode
 ```powershell
-.\start.bat
-```
-Choose option **[2] Sharding Mode** when prompted.
-
-#### Option 2: Direct Sharding Launch
-```powershell
-.\start-shard.bat
-# or
-node shard.js
+pnpm run shard
 ```
 
-#### Option 3: Normal Mode (< 1000 servers)
+#### Normal mode (< 1000 servers)
 ```powershell
-node index.js
+pnpm start
 ```
 
 ### ⚙️ Sharding Configuration
 
-Configure sharding in `.env` or `config.js`:
+Configure sharding in `.env` or `src/config.js`:
 
 ```dotenv
 # Sharding Settings
@@ -390,7 +386,7 @@ Discord recommends: **1 shard per 1,000 servers**
 
 | Servers | Recommended Shards |
 | --- | --- |
-| < 1,000 | No sharding needed (use `node index.js`) |
+| < 1,000 | No sharding needed (use `pnpm start`) |
 | 1,000 - 2,000 | 2 shards |
 | 2,000 - 3,000 | 3 shards |
 | 5,000+ | 5+ shards |
