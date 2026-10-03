@@ -446,7 +446,8 @@ module.exports = {
         await interaction.showModal(modal);
     },
 
-    async handleLoop(interaction, player, requesterId) {
+    // mode: 'off' | 'track' | 'queue' to set directly (from /loop); omitted to cycle like the button
+    async handleLoop(interaction, player, requesterId, mode) {
         // Authorization check
         if (!this.isAuthorized(interaction, requesterId)) {
             return await interaction.reply({
@@ -463,15 +464,25 @@ module.exports = {
         }
 
         // Cycle through loop modes: false -> 'track' -> 'queue' -> false
+        if (!mode) {
+            if (player.loop === false || player.loop === 'off') {
+                mode = 'track';
+            } else if (player.loop === 'track') {
+                mode = 'queue';
+            } else {
+                mode = 'off';
+            }
+        }
+
         let newLoopMode;
         let modeMessage;
         let modeEmoji;
 
-        if (player.loop === false || player.loop === 'off') {
+        if (mode === 'track') {
             newLoopMode = 'track';
             modeMessage = await LanguageManager.getTranslation(interaction.guild?.id, 'buttonhandler.loop_mode_track');
             modeEmoji = '🔂';
-        } else if (player.loop === 'track') {
+        } else if (mode === 'queue') {
             newLoopMode = 'queue';
             modeMessage = await LanguageManager.getTranslation(interaction.guild?.id, 'buttonhandler.loop_mode_queue');
             modeEmoji = '🔁';
@@ -523,21 +534,7 @@ module.exports = {
 
         // If autoplay is already enabled, turn it off
         if (player.autoplay) {
-            player.autoplay = false;
-
-            const embed = new EmbedBuilder()
-                .setTitle('🎲 ' + await LanguageManager.getTranslation(interaction.guild?.id, 'buttonhandler.autoplay_disabled'))
-                .setDescription(await LanguageManager.getTranslation(interaction.guild?.id, 'buttonhandler.autoplay_disabled_desc'))
-                .setColor(config.bot.embedColor)
-                .setTimestamp();
-
-            await interaction.reply({ embeds: [embed], flags: [1 << 6] });
-
-            // Update the main embed
-            if (interaction.client.musicEmbedManager) {
-                await interaction.client.musicEmbedManager.updateNowPlayingEmbed(player);
-            }
-            return;
+            return await this.disableAutoplay(interaction, player);
         }
 
         // Show genre selection menu
@@ -619,6 +616,23 @@ module.exports = {
             components: [row],
             flags: [1 << 6]
         });
+    },
+
+    async disableAutoplay(interaction, player) {
+        player.autoplay = false;
+
+        const embed = new EmbedBuilder()
+            .setTitle('🎲 ' + await LanguageManager.getTranslation(interaction.guild?.id, 'buttonhandler.autoplay_disabled'))
+            .setDescription(await LanguageManager.getTranslation(interaction.guild?.id, 'buttonhandler.autoplay_disabled_desc'))
+            .setColor(config.bot.embedColor)
+            .setTimestamp();
+
+        await interaction.reply({ embeds: [embed], flags: [1 << 6] });
+
+        // Update the main embed
+        if (interaction.client.musicEmbedManager) {
+            await interaction.client.musicEmbedManager.updateNowPlayingEmbed(player);
+        }
     },
 
     async handleHelpRefresh(interaction) {

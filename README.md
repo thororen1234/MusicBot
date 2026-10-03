@@ -509,6 +509,14 @@ SHARD_RESPAWN=false
 | `/play <query> [source]` | Smart-detects platform links or search keywords, queues playlists/albums, and spins up the control panel. `source` (YouTube/Tidal/SoundCloud) picks where searches play from; YouTube/Tidal also apply to Spotify/Apple Music/Deezer links. |
 | `/search <keywords> [source]` | Presents a selection menu of YouTube, Tidal or SoundCloud matches — choose with buttons. |
 | `/queue [page]` | Shows the current song and the upcoming queue, 10 per page, with page buttons. |
+| `/pause` | Pauses or resumes the current song (same as the ⏸️/▶️ button). |
+| `/skip` | Skips to the next queued song. |
+| `/stop` | Stops playback and clears the queue. |
+| `/shuffle` | Shuffles the queue (min. 2 tracks). |
+| `/volume [level]` | Sets the volume to 0–100; without a level, opens the volume dialog. |
+| `/loop [mode]` | Sets loop to Off/Track/Queue; without a mode, cycles like the button. |
+| `/autoplay [genre]` | Enables autoplay for a genre or turns it off; without a genre, toggles like the button. |
+| `/lyrics` | Shows the lyrics of the current song privately. |
 | `/nowplaying` | Drops the live embed again with the full control buttons, including queue status, repeat/shuffle flags, and volume. |
 | `/language` | Opens a flag button wall for instant localization (cached per guild). |
 | `/help` | Gorgeous, localized feature tour + live stats and support links. |
@@ -523,6 +531,8 @@ SHARD_RESPAWN=false
 - **🔊 Volume** – Opens a modal allowing 0–100 input.
 - **🔁 Loop** – Cycles through loop modes: Off → Track Repeat → Queue Repeat. Track mode replays the current song endlessly; Queue mode restarts the entire queue when finished.
 - **🎲 Autoplay** – Toggles genre-based autoplay (Off → On with genre selection). When enabled, the bot automatically adds matching music from your selected genre when the queue ends, keeping the music flowing seamlessly.
+
+Every button also has a matching slash command (`/pause`, `/skip`, `/stop`, `/queue`, `/shuffle`, `/volume`, `/loop`, `/autoplay`, `/lyrics`) with the same permission rules.
 
 All button sessions carry a short-lived signature, preventing stale interactions from previous queues.
 

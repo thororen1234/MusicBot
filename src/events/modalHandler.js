@@ -74,7 +74,14 @@ module.exports = {
             });
         }
 
-        const selectedGenre = interaction.values[0];
+        await this.enableAutoplay(interaction, player, interaction.values[0]);
+    },
+
+    // Shared by the autoplay genre menu and /autoplay
+    async enableAutoplay(interaction, player, selectedGenre) {
+        const client = interaction.client;
+        const guild = interaction.guild;
+        const member = interaction.member;
 
         // Enable autoplay with selected genre
         player.autoplay = selectedGenre;
@@ -133,7 +140,13 @@ module.exports = {
         }
 
         const volumeInput = interaction.fields.getTextInputValue('volume_input');
-        const volume = parseInt(volumeInput);
+        await this.applyVolume(interaction, player, parseInt(volumeInput));
+    },
+
+    // Shared by the volume modal and /volume
+    async applyVolume(interaction, player, volume) {
+        const guild = interaction.guild;
+        const member = interaction.member;
 
         // Validate volume
         if (isNaN(volume) || volume < 0 || volume > 100) {
