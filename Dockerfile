@@ -4,7 +4,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production \
     PNPM_HOME=/pnpm \
-    PATH=/pnpm:$PATH
+    PATH=/pnpm:$PATH \
+    FFMPEG_PATH=/usr/lib/jellyfin-ffmpeg/ffmpeg
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates curl gnupg python3 python3-pip && \

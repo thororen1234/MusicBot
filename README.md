@@ -91,7 +91,7 @@ discord-musicbot/
 - **Discord application** with a bot user created in the [Discord Developer Portal](https://discord.com/developers/applications).
 - *(Optional but recommended)* A VPS or host with stable bandwidth and low latency to Discord voice regions.
 
-> ℹ️ `ffmpeg-static` ships with the project. You do **not** need a system-wide FFmpeg unless you prefer using a custom build.
+> ℹ️ A system-wide FFmpeg on your PATH is used when available (set `FFMPEG_PATH` to use a specific binary); otherwise the bundled `ffmpeg-static` build is used. A system FFmpeg with `ffprobe` is recommended, since yt-dlp needs both for downloads.
 
 ---
 

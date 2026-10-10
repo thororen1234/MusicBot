@@ -23,7 +23,7 @@ const ErrorHandler = require('../utils/ErrorHandler');
 const PlayerStateManager = require('./PlayerStateManager');
 const LyricsManager = require('./LyricsManager');
 const prism = require('prism-media');
-const ffmpegPath = require('ffmpeg-static');
+const ffmpegPath = require('../utils/ffmpeg');
 const { Readable } = require('stream');
 const { spawn } = require('child_process');
 const fs = require('fs').promises;
@@ -595,7 +595,9 @@ class MusicPlayer {
                         'ffmpeg': ['-c:a', 'libopus', '-b:a', '128k']
                     },
                     extractAudio: true,
-                    audioFormat: 'opus'
+                    audioFormat: 'opus',
+                    // yt-dlp finds a system ffmpeg on PATH itself; only point it at explicit paths
+                    ...(path.isAbsolute(ffmpegPath) && { ffmpegLocation: ffmpegPath })
                 }));
             } else {
                 // For direct and decoded streams, transcode with FFmpeg.
