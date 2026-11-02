@@ -84,6 +84,8 @@ console.log(chalk.blue(`📊 Sharding Mode: ${config.sharding?.mode || 'process'
 console.log(chalk.blue(`🔢 Total Shards: ${config.sharding?.totalShards || 'auto'}`));
 console.log(chalk.blue('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'));
 
+require('./scripts/update-ytdlp').scheduleYtDlpUpdates();
+
 manager.spawn({
     amount: config.sharding?.totalShards || 'auto',
     delay: config.sharding?.spawnDelay || 5500, // Delay between shard spawns (Discord recommends 5-5.5 seconds)

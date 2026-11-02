@@ -10,6 +10,11 @@ const { default: chalk } = require('chalk');
 
 require('./loaders/commandLoader'); // Load and deploy commands
 
+// Under sharding the manager runs the updater, so shards don't race on the binary
+if (!process.env.SHARDING_MANAGER) {
+    require('./scripts/update-ytdlp').scheduleYtDlpUpdates();
+}
+
 // Clean up audio cache directory on startup
 async function cleanupAudioCache() {
     const cacheDir = path.join(__dirname, '..', 'audio_cache');
