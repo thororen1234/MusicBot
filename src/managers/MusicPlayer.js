@@ -904,6 +904,8 @@ class MusicPlayer {
                 let audioStream;
                 if (typeof streamInfo === 'object' && streamInfo.stream) {
                     audioStream = streamInfo.stream;
+                } else if (typeof streamInfo === 'object' && typeof streamInfo.openStream === 'function') {
+                    audioStream = streamInfo.openStream();
                 } else if (typeof streamUrl_final === 'string') {
                     const fetch = await ensureFetch();
 

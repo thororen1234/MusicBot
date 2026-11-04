@@ -156,37 +156,21 @@ class YouTube {
                 throw new Error(errorMsg);
             }
 
-            // Get stream URL with simple format
-            const info = await youtubedl(url, this.getYtDlpOptions({
-                dumpSingleJson: true,
-                format: 'bestaudio/best',
-            }));
-
-            if (!info || !info.url) {
-                const errorMsg = guildId ? await LanguageManager.getTranslation(guildId, 'youtube.no_stream_url') : 'No stream URL found';
-                throw new Error(errorMsg);
-            }
-
-            const baseUrl = info.url;
-            const canSeek = /googlevideo\.com/i.test(baseUrl);
-            let finalUrl = baseUrl;
-
-            const seekSeconds = Math.max(0, Number(startSeconds) || 0);
-            if (seekSeconds > 0 && canSeek) {
-                const startMs = Math.floor(seekSeconds * 1000);
-                const separator = baseUrl.includes('?') ? '&' : '?';
-                finalUrl = `${baseUrl}${separator}begin=${startMs}`;
-            }
-
+            // googlevideo URLs answer 403 to anything but yt-dlp itself, so yt-dlp streams the audio.
+            // Started lazily: preloads and cached-file playback never open it. Seeking is done by FFmpeg.
             return {
-                url: finalUrl,
-                rawUrl: baseUrl,
-                type: info.acodec && info.acodec.includes('opus') ? 'opus' : 'arbitrary',
-                duration: info.duration || 0,
-                bitrate: info.abr || info.tbr || 0,
-                canSeek,
-                format: info.format,
-                httpHeaders: info.http_headers || {}
+                url,
+                duration: 0,
+                canSeek: false,
+                openStream: () => {
+                    const subprocess = youtubedl.exec(url, this.getYtDlpOptions({
+                        format: 'bestaudio/best',
+                        output: '-',
+                        quiet: true,
+                    }));
+                    subprocess.catch(() => { }); // Killed when playback stops - not an error
+                    return subprocess.stdout;
+                },
             };
 
         } catch (error) {
