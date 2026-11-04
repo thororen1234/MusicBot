@@ -95,6 +95,18 @@ class SongLink {
             }
         }
 
+        // SongLink often has no Tidal link, so search Tidal for the exact song before falling back to YouTube
+        if (source === 'tidal' && entity.type !== 'album' && entity.title) {
+            try {
+                const query = [entity.title, entity.artistName].filter(Boolean).join(' ');
+                const target = { title: entity.title, artist: entity.artistName };
+                const match = (await Tidal.search(query, 5)).find(track => isExactTrackMatch(target, track));
+                if (match) return { tracks: [match], isPlaylist: false };
+            } catch (error) {
+                console.error(error.message);
+            }
+        }
+
         const youtubeUrl = links.youtube?.url || this.toYouTubeURL(links.youtubeMusic?.url);
 
         // The API only matches songs on YouTube, so albums have no YouTube link
