@@ -89,6 +89,8 @@ module.exports = {
         maxQueueSize: 100,
         maxPlaylistSize: 50,
         status: process.env.STATUS || '🎵 Beatra | /play',
+        // Prefix for text commands, e.g. !!play (set PREFIX= blank to disable)
+        prefix: process.env.PREFIX ?? '!!',
         embedColor: process.env.EMBED_COLOR || '#FF6B6B',
         // Default /play and /search source - YouTube unless set to tidal or soundcloud
         defaultSource: ['tidal', 'soundcloud'].includes((process.env.DEFAULT_SOURCE || '').trim().toLowerCase())

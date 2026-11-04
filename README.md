@@ -521,6 +521,8 @@ SHARD_RESPAWN=false
 | `/language` | Opens a flag button wall for instant localization (cached per guild). |
 | `/help` | Gorgeous, localized feature tour + live stats and support links. |
 
+Every command also works with the `!!` prefix (change it with `PREFIX`, leave it blank to turn prefix commands off). The text after the command fills its main option, `name:value` sets the others, and an attached file goes to `/play`'s file option: `!!play never gonna give you up source:soundcloud`, `!!volume 50`, `!!loop track`. Replies that would be private are public, and `!!volume` without a level needs `/volume` for the dialog.
+
 ### On-embed Controls
 
 - **⏸️ / ▶️ Pause & Resume** – Auth-limited to DJs, admins, or the original requester.
