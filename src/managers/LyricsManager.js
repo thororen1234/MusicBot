@@ -10,7 +10,13 @@ class LyricsManager {
 
         // Initialize Genius client (works without token via web scraping)
         // Token can be added later for higher rate limits: new Genius.Client(token)
-        this.geniusClient = new Genius.Client();
+        // genius-lyrics passes undici 6 options, which the global dispatcher rejects when it comes from
+        // undici 7 (Node 24's built-in fetch): "invalid throwOnError". Give it an Agent from its own undici.
+        const { Agent } = require('genius-lyrics/dist/helpers/http');
+        const dispatcher = new Agent();
+        this.geniusClient = new Genius.Client(undefined, { requestOptions: { dispatcher } });
+        this.geniusClient.request.options.dispatcher = dispatcher;
+        this.geniusClient.api.options.dispatcher = dispatcher;
     }
 
 
