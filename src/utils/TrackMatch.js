@@ -65,7 +65,7 @@ function isExactTrackMatch(source, candidate) {
 
 /**
  * A free-text query matches a track when it is made only of the track's title words,
- * plus (optionally) words from its artist name - e.g. "daft punk one more time".
+ * plus (optionally) words from its artist name - e.g. "daft punk one more time" or "one more time by daft punk".
  */
 function isExactQueryMatch(query, candidate) {
     const queryWords = clean(fold(query)).split(' ').filter(Boolean);
@@ -79,7 +79,8 @@ function isExactQueryMatch(query, candidate) {
         remaining.splice(index, 1);
     }
 
-    const artistWords = new Set(normalizeArtist(candidate.artist).split(' '));
+    // "by" as in "duvet by boa"
+    const artistWords = new Set([...normalizeArtist(candidate.artist).split(' '), 'by']);
     return remaining.every(word => artistWords.has(word));
 }
 
