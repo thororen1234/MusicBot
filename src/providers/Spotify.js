@@ -1,3 +1,4 @@
+const axios = require('axios');
 const SpotifyWebApi = require('spotify-web-api-node');
 const config = require('../config');
 const LanguageManager = require('../managers/LanguageManager');
@@ -34,14 +35,19 @@ class Spotify {
     }
 
     static async getFromURL(url, guildId = null) {
+        const { type, id } = this.parseSpotifyURL(url);
+        if (!type || !id) return [];
+
+        if (this.isConfigured()) {
+            const tracks = await this.getFromAPI(type, id, guildId);
+            if (tracks.length > 0) return tracks;
+        }
+        // No API keys, or the API refused it (Spotify-owned playlists aren't available to client-credential apps)
+        return this.getFromEmbed(type, id);
+    }
+
+    static async getFromAPI(type, id, guildId = null) {
         try {
-            const { type, id } = this.parseSpotifyURL(url);
-
-            if (!type || !id) {
-                const errorMsg = guildId ? await LanguageManager.getTranslation(guildId, 'spotify.invalid_url') : 'Invalid Spotify URL';
-                throw new Error(errorMsg);
-            }
-
             await this.initializeApi();
 
             switch (type) {
@@ -54,12 +60,55 @@ class Spotify {
                 case 'artist':
                     return await this.getArtistTopTracks(id, guildId);
                 default:
-                    const errorMsg = guildId ?
-                        await LanguageManager.getTranslation(guildId, 'spotify.unsupported_type').replace('{type}', type) :
-                        `Unsupported Spotify type: ${type}`;
-                    throw new Error(errorMsg);
+                    return [];
             }
         } catch (error) {
+            return [];
+        }
+    }
+
+    /**
+     * Reads the track list from Spotify's public embed page, which needs no API keys.
+     * Playlists and albums give up to 100 tracks, artists their top 10.
+     */
+    static async getFromEmbed(type, id) {
+        try {
+            const { data: html } = await axios.get(`https://open.spotify.com/embed/${type}/${id}`, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36' },
+                timeout: 15000,
+            });
+            const json = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/)?.[1];
+            const entity = json && JSON.parse(json).props?.pageProps?.state?.data?.entity;
+            if (!entity) return [];
+
+            const cover = entity.coverArt?.sources?.[0]?.url || entity.visualIdentity?.image?.[0]?.url || null;
+            const album = type === 'album' ? entity.name : undefined;
+            const items = entity.trackList || (type === 'track' ? [{ ...entity, subtitle: entity.artists?.map(a => a.name).join(', ') }] : []);
+
+            return items
+                .filter(item => item.uri?.startsWith('spotify:track:') && item.isPlayable !== false)
+                .slice(0, config.bot.maxPlaylistSize)
+                .map(item => {
+                    const trackId = item.uri.split(':')[2];
+                    const title = item.title || item.name || 'Unknown Title';
+                    const artist = item.subtitle || 'Unknown Artist';
+                    return {
+                        title,
+                        artist,
+                        album,
+                        url: `https://open.spotify.com/track/${trackId}`,
+                        spotifyUrl: `https://open.spotify.com/track/${trackId}`,
+                        duration: Math.floor((item.duration || 0) / 1000),
+                        thumbnail: cover,
+                        platform: 'spotify',
+                        type: 'track',
+                        id: trackId,
+                        explicit: item.isExplicit,
+                        searchQuery: `${title} ${artist}`,
+                    };
+                });
+        } catch (error) {
+            console.error(`[Spotify] embed lookup failed for ${type}/${id}:`, error.message);
             return [];
         }
     }
@@ -171,27 +220,14 @@ class Spotify {
     }
 
     static isSpotifyURL(url) {
-        const patterns = [
-            /^https?:\/\/open\.spotify\.com\/(track|album|playlist|artist)\/[a-zA-Z0-9]+/,
-            /^spotify:(track|album|playlist|artist):[a-zA-Z0-9]+/,
-        ];
-        return patterns.some(pattern => pattern.test(url));
+        return !!this.parseSpotifyURL(url).type;
     }
 
+    // open.spotify.com links (including /intl-xx/ ones) and spotify: URIs
     static parseSpotifyURL(url) {
-        // Handle open.spotify.com URLs
-        let match = url.match(/^https?:\/\/open\.spotify\.com\/(track|album|playlist|artist)\/([a-zA-Z0-9]+)/);
-        if (match) {
-            return { type: match[1], id: match[2] };
-        }
-
-        // Handle spotify: URIs
-        match = url.match(/^spotify:(track|album|playlist|artist):([a-zA-Z0-9]+)/);
-        if (match) {
-            return { type: match[1], id: match[2] };
-        }
-
-        return { type: null, id: null };
+        const match = url.match(/^https?:\/\/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(track|album|playlist|artist)\/([a-zA-Z0-9]+)/)
+            || url.match(/^spotify:(track|album|playlist|artist):([a-zA-Z0-9]+)/);
+        return match ? { type: match[1], id: match[2] } : { type: null, id: null };
     }
 }
 

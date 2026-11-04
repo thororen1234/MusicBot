@@ -506,11 +506,11 @@ class MusicPlayer {
     }
 
     /**
-     * Tracks whose audio comes from a YouTube equivalent: Spotify tracks, and SoundCloud
-     * tracks that SoundCloud only offers as a 30 second preview.
+     * Tracks whose audio comes from a YouTube equivalent: Spotify, Deezer and Apple Music tracks, and
+     * SoundCloud tracks that SoundCloud only offers as a 30 second preview.
      */
     playsViaYouTube(track) {
-        return track.platform === 'spotify' || (track.platform === 'soundcloud' && track.preview);
+        return ['spotify', 'deezer', 'applemusic'].includes(track.platform) || (track.platform === 'soundcloud' && track.preview);
     }
 
     /**
@@ -584,7 +584,7 @@ class MusicPlayer {
             }
 
             // yt-dlp extracts YouTube, Spotify mirrors, SoundCloud, and the additional external sources.
-            if (track.platform === 'youtube' || track.platform === 'spotify' || track.platform === 'soundcloud' || track.platform === 'external') {
+            if (this.playsViaYouTube(track) || ['youtube', 'soundcloud', 'external'].includes(track.platform)) {
                 const youtubedl = require('youtube-dl-exec');
 
                 await youtubedl(downloadUrl, YouTube.getYtDlpOptions({

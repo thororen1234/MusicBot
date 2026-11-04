@@ -263,18 +263,20 @@ class YouTube {
 
     static isYouTubeURL(url) {
         const patterns = [
-            /^https?:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/playlist\?list=)/,
+            /^https?:\/\/((www|m|music)\.)?youtube\.com\/(watch\?v=|playlist\?list=|shorts\/|browse\/(MPREb_|VL))/,
+            /^https?:\/\/youtu\.be\//,
             /^https?:\/\/(www\.)?youtube\.com\/embed\/[a-zA-Z0-9_-]+/,
             /^https?:\/\/(www\.)?youtube\.com\/v\/[a-zA-Z0-9_-]+/,
         ];
         return patterns.some(pattern => pattern.test(url));
     }
 
+    // Playlists, mixes and YouTube Music albums (music.youtube.com/browse/MPREb_...)
     static isPlaylist(url) {
-        return url.includes('list=') &&
+        return /youtube\.com\/browse\/(MPREb_|VL)/.test(url) || (url.includes('list=') &&
             (url.includes('youtube.com/playlist') ||
                 url.includes('youtube.com/watch') ||
-                url.includes('youtu.be'));
+                url.includes('youtu.be')));
     }
 
     static parseDuration(durationString) {

@@ -71,7 +71,7 @@ module.exports = {
         },
     },
 
-    // Spotify API Settings (optional fallback for Spotify playlists/artists)
+    // Spotify API Settings (optional - Spotify links work without it via the public embed page)
     spotify: {
         clientId: process.env.SPOTIFY_CLIENT_ID || 'YOUR_SPOTIFY_CLIENT_ID',
         clientSecret: process.env.SPOTIFY_CLIENT_SECRET || 'YOUR_SPOTIFY_CLIENT_SECRET',

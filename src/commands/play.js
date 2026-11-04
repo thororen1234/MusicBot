@@ -151,6 +151,8 @@ module.exports = {
         const Spotify = require('../providers/Spotify');
         const SongLink = require('../providers/SongLink');
         const Tidal = require('../providers/Tidal');
+        const Deezer = require('../providers/Deezer');
+        const AppleMusic = require('../providers/AppleMusic');
         const SoundCloud = require('../providers/SoundCloud');
         const DirectLink = require('../providers/DirectLink');
         const ExternalSources = require('../providers/ExternalSources');
@@ -252,19 +254,26 @@ module.exports = {
                     // Spotify/Apple Music/Deezer/Tidal links -> matching Tidal or YouTube track via the SongLink API.
                     // Tidal links always prefer Tidal when it's set up, whatever the chosen source.
                     const linkSource = Tidal.isConfigured() && Tidal.isTidalURL(query) ? 'tidal' : source;
+                    const spotifyType = Spotify.parseSpotifyURL(query).type;
                     let songlinkError = null;
-                    try {
-                        ({ tracks, isPlaylist } = await SongLink.getTracks(query, guildId, linkSource));
-                    } catch (error) {
-                        songlinkError = error;
-                        console.error(error.message);
-                    }
 
-                    // SongLink can't resolve Spotify playlists/artists/albums to YouTube - use the Spotify API for those when it's set up
-                    if (tracks.length === 0 && Spotify.isSpotifyURL(query) && Spotify.isConfigured()) {
-                        tracks = await Spotify.getFromURL(query, guildId) || [];
-                        const { type } = Spotify.parseSpotifyURL(query);
-                        isPlaylist = type === 'playlist' || type === 'album' || type === 'artist';
+                    // SongLink only resolves single songs, so playlists/albums/artists are read from the service itself
+                    const collection = spotifyType && spotifyType !== 'track'
+                        ? await Spotify.getFromURL(query, guildId)
+                        : await AppleMusic.getCollection(query) ?? await Deezer.getCollection(query);
+                    if (collection) {
+                        tracks = collection;
+                        isPlaylist = true;
+                    } else {
+                        try {
+                            ({ tracks, isPlaylist } = await SongLink.getTracks(query, guildId, linkSource));
+                        } catch (error) {
+                            songlinkError = error;
+                            console.error(error.message);
+                        }
+                        if (tracks.length === 0 && spotifyType) {
+                            tracks = await Spotify.getFromURL(query, guildId);
+                        }
                     }
 
                     if (tracks.length === 0) {
