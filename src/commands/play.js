@@ -308,6 +308,12 @@ module.exports = {
                 return { success: false, message: errorMsg };
             }
 
+            // Tracks that would play from YouTube (Spotify/Apple Music/Deezer playlists, SoundCloud previews)
+            // are swapped for their Tidal version at play time when there's an exact match
+            if (source === 'tidal') {
+                for (const track of tracks) track.preferredSource = 'tidal';
+            }
+
             return {
                 success: true,
                 isPlaylist: isPlaylist,

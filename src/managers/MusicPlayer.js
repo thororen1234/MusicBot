@@ -21,6 +21,7 @@ const UploadedFile = require('../providers/UploadedFile');
 const LanguageManager = require('./LanguageManager');
 const ErrorHandler = require('../utils/ErrorHandler');
 const PlayerStateManager = require('./PlayerStateManager');
+const { isExactTrackMatch } = require('../utils/TrackMatch');
 const LyricsManager = require('./LyricsManager');
 const prism = require('prism-media');
 const ffmpegPath = require('../utils/ffmpeg');
@@ -514,6 +515,30 @@ class MusicPlayer {
     }
 
     /**
+     * When Tidal was the chosen source, turns a track that would play from YouTube into the same song on Tidal.
+     * Checked once per track, at play or preload time, so queueing a long playlist doesn't search every track up front.
+     */
+    async resolvePreferredSource(track) {
+        if (!track || track.preferredSource !== 'tidal' || track.tidalChecked) return;
+        if (!this.playsViaYouTube(track) || !Tidal.isConfigured()) return;
+        track.tidalChecked = true;
+
+        try {
+            const query = [track.title, track.artist].filter(Boolean).join(' ');
+            const match = (await Tidal.search(query, 5)).find(candidate => isExactTrackMatch(track, candidate));
+            if (match) {
+                Object.assign(track, match, {
+                    sourceUrl: track.sourceUrl || track.url,
+                    thumbnail: track.thumbnail || match.thumbnail,
+                    preview: false,
+                });
+            }
+        } catch (error) {
+            console.error(error.message);
+        }
+    }
+
+    /**
      * Downloads audio stream to a local file
      * Works with YouTube, Spotify (via YouTube), SoundCloud, DirectLink and Tidal
      */
@@ -698,6 +723,8 @@ class MusicPlayer {
             this.lastPlaybackPosition = resumeFromMs;
             this.pausedTime = 0;
             this.startTime = null; // Will be set when Playing event fires
+
+            await this.resolvePreferredSource(this.currentTrack);
 
             // Get audio stream - check preloaded first!
             let streamUrl = this.currentTrack.url;
@@ -1732,6 +1759,8 @@ class MusicPlayer {
     async preloadTrack(track) {
         if (!track || !track.url) return;
 
+        await this.resolvePreferredSource(track);
+
         // Check if already downloaded
         const hash = crypto.createHash('md5').update(track.url).digest('hex');
         const filepath = path.join(CACHE_DIR, `track_${hash}.opus`);
@@ -1893,6 +1922,8 @@ class MusicPlayer {
             preview: track.preview || false,
             soundcloudUrl: track.soundcloudUrl || null,
             spotifyUrl: track.spotifyUrl || null,
+            preferredSource: track.preferredSource || null,
+            tidalChecked: Boolean(track.tidalChecked),
             isLive: track.isLive || track.live || false,
             addedAt: track.addedAt || Date.now(),
             requesterId,
@@ -1918,6 +1949,8 @@ class MusicPlayer {
             preview: Boolean(data.preview),
             soundcloudUrl: data.soundcloudUrl || null,
             spotifyUrl: data.spotifyUrl || null,
+            preferredSource: data.preferredSource || null,
+            tidalChecked: Boolean(data.tidalChecked),
             isLive: Boolean(data.isLive),
             addedAt: data.addedAt || Date.now(),
             extra: data.extra || null
