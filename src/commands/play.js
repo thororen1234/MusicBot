@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const config = require('../config');
 const MusicPlayer = require('../managers/MusicPlayer');
 const MusicEmbedManager = require('../managers/MusicEmbedManager');
@@ -114,10 +114,12 @@ module.exports = {
                 if (interaction.deferred && !interaction.replied) {
                     await interaction.editReply({ content: errorMsg });
                 } else if (!interaction.replied && !interaction.deferred) {
-                    await interaction.reply({ content: errorMsg, ephemeral: true });
+                    await interaction.reply({ content: errorMsg, flags: MessageFlags.Ephemeral });
                 }
             } catch (responseError) {
-                console.error('Error sending error response:', responseError);
+                if (responseError.code !== 10062) {
+                    console.error('Error sending error response:', responseError);
+                }
             }
         }
     },

@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const config = require('../config');
 const LanguageManager = require('../managers/LanguageManager');
 
@@ -18,7 +18,7 @@ module.exports = {
                 const noPlayerMsg = await LanguageManager.getTranslation(guildId, 'commands.nowplaying.no_player');
                 return await interaction.reply({
                     embeds: [await this.createErrorEmbed(noPlayerMsg, guildId)],
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -26,7 +26,7 @@ module.exports = {
                 const noTrackMsg = await LanguageManager.getTranslation(guildId, 'commands.nowplaying.no_track');
                 return await interaction.reply({
                     embeds: [await this.createErrorEmbed(noTrackMsg, guildId)],
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
