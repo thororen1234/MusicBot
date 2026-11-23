@@ -12,6 +12,7 @@ module.exports = {
         .addStringOption(option =>
             option.setName('query')
             .setDescription('Song, supported URL, ftts://text, or direct audio link')
+                .setAutocomplete(true)
                 .setRequired(false)
         )
         .addAttachmentOption(option =>
@@ -121,6 +122,29 @@ module.exports = {
                     console.error('Error sending error response:', responseError);
                 }
             }
+        }
+    },
+
+    async autocomplete(interaction) {
+        const focused = interaction.options.getFocused().trim();
+        const looksLikeUrl = /^(?:https?:\/\/|www\.)/i.test(focused)
+            || /^[\w-]+(?:\.[\w-]+)+(?:\/|$)/i.test(focused);
+        if (!focused || looksLikeUrl) {
+            return interaction.respond([]);
+        }
+
+        const Tidal = require('../providers/Tidal');
+        if (!Tidal.isConfigured()) return interaction.respond([]);
+
+        try {
+            const tracks = await Tidal.search(focused.slice(0, 100), 25);
+            return interaction.respond(tracks.map(track => ({
+                name: `${track.title} — ${track.artist}`.slice(0, 100),
+                value: track.url.slice(0, 100),
+            })));
+        } catch (error) {
+            console.error('[Tidal] /play autocomplete failed:', error.message);
+            return interaction.respond([]);
         }
     },
 

@@ -516,6 +516,7 @@ SHARD_RESPAWN=false
 | `/volume [level]` | Sets the volume to 0–100; without a level, opens the volume dialog. |
 | `/loop [mode]` | Sets loop to Off/Track/Queue; without a mode, cycles like the button. |
 | `/autoplay [genre]` | Enables autoplay for a genre or turns it off; without a genre, toggles like the button. |
+| `/247` | Keeps the bot connected to voice while the queue is empty; run it again to turn this off. |
 | `/lyrics` | Shows the lyrics of the current song privately. |
 | `/nowplaying` | Drops the live embed again with the full control buttons, including queue status, repeat/shuffle flags, and volume. |
 | `/language` | Opens a flag button wall for instant localization (cached per guild). |

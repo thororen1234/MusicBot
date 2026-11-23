@@ -127,6 +127,7 @@ class MusicPlayer {
         this.loop = false; // false, 'track', 'queue'
         this.shuffle = false;
         this.autoplay = false; // false or genre string: 'pop', 'rock', 'hiphop', etc.
+        this.stayConnected247 = false;
         this.paused = false;
 
         // Timestamps
@@ -1288,6 +1289,11 @@ class MusicPlayer {
             const channel = channelId ? this.guild.channels.cache.get(channelId) : null;
             const hasListeners = channel ? channel.members.filter(member => !member.user.bot).size > 0 : false;
 
+            if (this.stayConnected247) {
+                this.pauseFor('alone');
+                return;
+            }
+
             if (hasListeners) {
                 this.resumeFor('alone');
                 if (global.clients?.musicEmbedManager) {
@@ -1623,6 +1629,12 @@ class MusicPlayer {
             }
 
             this.clearInactivityTimer(false);
+            if (this.stayConnected247) {
+                if (this.guild?.id) {
+                    await PlayerStateManager.saveState(this.guild.id, this.serializeState());
+                }
+                return;
+            }
             if (this.guild?.id) {
                 await PlayerStateManager.removeState(this.guild.id);
             }
@@ -1630,7 +1642,7 @@ class MusicPlayer {
             clearTimeout(this.queueEndTimer);
             this.queueEndTimer = setTimeout(() => {
                 this.queueEndTimer = null;
-                if (this.queue.length === 0 && !this.currentTrack) {
+                if (!this.stayConnected247 && this.queue.length === 0 && !this.currentTrack) {
                     this.cleanup();
                     const clientInstance = this.guild?.client;
                     if (clientInstance?.players?.get(this.guild.id) === this) {
@@ -2042,6 +2054,7 @@ class MusicPlayer {
             loop: this.loop,
             shuffle: this.shuffle,
             autoplay: this.autoplay,
+            stayConnected247: this.stayConnected247,
             filter: this.currentFilter,
             paused: this.paused,
             pauseReasons: Array.from(this.pauseReasons || []),
@@ -2071,6 +2084,7 @@ class MusicPlayer {
         this.loop = state.loop ?? false;
         this.shuffle = state.shuffle ?? false;
         this.autoplay = state.autoplay ?? false;
+        this.stayConnected247 = Boolean(state.stayConnected247);
         this.currentFilter = config.audio.filters[state.filter] ? state.filter : null;
         this.requesterId = state.requesterId || this.requesterId;
 
@@ -2141,7 +2155,9 @@ class MusicPlayer {
         }
 
         if (!this.currentTrack) {
-            await PlayerStateManager.removeState(this.guild.id);
+            if (!this.stayConnected247) {
+                await PlayerStateManager.removeState(this.guild.id);
+            }
             return;
         }
 
