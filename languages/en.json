@@ -26,18 +26,26 @@
         "`/nowplaying` - Information about the current song",
         "`/queue [page]` - Show the music queue",
         "`/pause` - Pause or resume the music",
+        "`/previous` - Play the previous song again",
         "`/skip` - Skip to the next song",
+        "`/seek <time>` - Jump to a position in the current song",
         "`/stop` - Stop the music and clear the queue",
         "`/shuffle` - Shuffle the queue",
+        "`/remove <position>` - Remove a song from the queue",
+        "`/move <from> <to>` - Move a song in the queue",
+        "`/clear` - Clear the queue",
+        "`/filter <name>` - Apply an audio filter (Bass Boost, Nightcore, Vaporwave, 8D)",
+        "`/playlist <save|load|list|delete>` - Save the queue as a playlist and load it later",
         "`/volume [level]` - Set the volume (0-100)",
         "`/loop [mode]` - Set the loop mode (Off/Track/Queue)",
-        "`/autoplay [genre]` - Toggle genre-based autoplay",
+        "`/autoplay [genre]` - Toggle autoplay with similar songs or a genre",
         "`/lyrics` - Show the lyrics of the current song",
         "`/help` - Display this help menu",
         "`/search <query> [source]` - Search and select music on YouTube, Tidal or SoundCloud"
       ],
       "button_controls_title": "🎛️ Button Controls",
       "button_controls_list": [
+        "⏮️ **Previous** - Play the previous song again",
         "⏸️/▶️ **Pause/Resume** - Pause or resume the music",
         "⏭️ **Skip** - Skip to the next song",
         "⏹️ **Stop** - Stop the music completely",
@@ -314,6 +322,7 @@
   "buttons": {
     "pause": "Pause",
     "resume": "Resume",
+    "previous": "Previous",
     "skip": "Skip",
     "stop": "Stop",
     "queue": "Queue",
@@ -328,6 +337,7 @@
     "lyrics": "Lyrics"
   },
   "genres": {
+    "similar": "Similar Songs",
     "pop": "Pop",
     "rock": "Rock",
     "hiphop": "Hip-Hop",

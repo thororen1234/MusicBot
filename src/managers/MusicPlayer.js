@@ -21,7 +21,8 @@ const UploadedFile = require('../providers/UploadedFile');
 const LanguageManager = require('./LanguageManager');
 const ErrorHandler = require('../utils/ErrorHandler');
 const PlayerStateManager = require('./PlayerStateManager');
-const { isExactTrackMatch } = require('../utils/TrackMatch');
+const Deezer = require('../providers/Deezer');
+const { isExactTrackMatch, isExactQueryMatch, normalizeTitle } = require('../utils/TrackMatch');
 const LyricsManager = require('./LyricsManager');
 const prism = require('prism-media');
 const ffmpegPath = require('../utils/ffmpeg');
@@ -180,6 +181,7 @@ class MusicPlayer {
         // Inactivity timeout
         this.inactivityTimer = null;
         this.inactivityTimeoutMs = 2 * 60 * 1000;
+        this.queueEndTimer = null;
 
         // Local file caching
         this.currentDownloadedFile = null; // Path to currently playing downloaded file
@@ -406,7 +408,7 @@ class MusicPlayer {
 
         try {
             const resumeMs = this.resource
-                ? this.currentTrackStartOffsetMs + (this.resource.playbackDuration || 0)
+                ? this.currentTrackStartOffsetMs + (this.resource.playbackDuration || 0) * this.getPlaybackSpeed()
                 : this.lastPlaybackPosition || 0;
             await this.play(null, resumeMs);
 
@@ -690,6 +692,9 @@ class MusicPlayer {
 
     async play(trackIndex = null, seekMs = 0) {
         try {
+            clearTimeout(this.queueEndTimer);
+            this.queueEndTimer = null;
+
             // If no current track, get from queue
             if (!this.currentTrack) {
                 if (this.queue.length === 0) {
@@ -957,6 +962,7 @@ class MusicPlayer {
                             '-analyzeduration', '0',
                             '-loglevel', '0',
                             '-i', 'pipe:0',
+                            ...(this.currentFilter ? ['-af', config.audio.filters[this.currentFilter].af] : []),
                             '-f', 's16le',
                             '-ar', '48000',
                             '-ac', '2'
@@ -998,6 +1004,7 @@ class MusicPlayer {
                         '-i', downloadedFile,
                         '-analyzeduration', '0',
                         '-loglevel', '0',
+                        ...(this.currentFilter ? ['-af', config.audio.filters[this.currentFilter].af] : []),
                         '-f', 's16le',
                         '-ar', '48000',
                         '-ac', '2'
@@ -1099,7 +1106,7 @@ class MusicPlayer {
         if (durationSeconds && durationSeconds > 0) {
             // Calculate remaining time considering the start offset (in seconds)
             const startOffsetSeconds = Math.floor((this.currentTrackStartOffsetMs || 0) / 1000);
-            const remainingSeconds = Math.max(1, durationSeconds - startOffsetSeconds);
+            const remainingSeconds = Math.max(1, (durationSeconds - startOffsetSeconds) / this.getPlaybackSpeed());
 
             this.expectedTrackEndTs = Date.now() + (remainingSeconds * 1000);
             // Add 4 seconds buffer, but ensure minimum 5 seconds timeout
@@ -1163,11 +1170,11 @@ class MusicPlayer {
         const status = this.audioPlayer.state?.status;
 
         if (status === AudioPlayerStatus.Playing) {
-            const playbackMs = this.resource?.playbackDuration || 0;
+            const playbackMs = this.currentTrackStartOffsetMs + (this.resource?.playbackDuration || 0) * this.getPlaybackSpeed();
             const durationMs = (Number(this.currentTrack.duration) || 0) * 1000;
 
             if (durationMs > 0 && playbackMs + 1500 < durationMs) {
-                const remainingMs = Math.max(durationMs - playbackMs, 2000);
+                const remainingMs = Math.max((durationMs - playbackMs) / this.getPlaybackSpeed(), 2000);
                 this.trackTimer = setTimeout(() => this.ensureTrackCompletion(), remainingMs);
                 return;
             }
@@ -1386,17 +1393,37 @@ class MusicPlayer {
         return false;
     }
 
-    previous() {
-        if (this.previousTracks.length > 0) {
-            if (this.currentTrack) {
-                this.queue.unshift(this.currentTrack);
-            }
-            this.currentTrack = this.previousTracks.pop();
-            this.audioPlayer.stop(); // This will trigger play
-            this.scheduleStatePersist('previous', 0);
-            return true;
+    async previous() {
+        if (this.previousTracks.length === 0) return false;
+
+        if (this.currentTrack) {
+            this.queue.unshift(this.currentTrack);
         }
-        return false;
+        this.currentTrack = this.previousTracks.pop();
+        // The cached file belongs to the track we're leaving; play() would otherwise reuse it
+        this.currentDownloadedFile = null;
+        this.currentTrackRetries = 0;
+        const result = await this.play(null, 0);
+        return result.success;
+    }
+
+    async seek(positionMs) {
+        if (!this.currentTrack) return false;
+        const result = await this.play(null, Math.max(0, positionMs));
+        return result.success;
+    }
+
+    async setFilter(filter) {
+        const position = this.getCurrentTime();
+        this.currentFilter = filter && config.audio.filters[filter] ? filter : null;
+        this.scheduleStatePersist('filter', 0);
+        if (!this.currentTrack || !this.resource) return true;
+        const result = await this.play(null, position);
+        return result.success;
+    }
+
+    getPlaybackSpeed() {
+        return config.audio.filters[this.currentFilter]?.speed || 1;
     }
 
     setVolume(volume) {
@@ -1483,14 +1510,14 @@ class MusicPlayer {
     getCurrentTime() {
         const playbackDuration = this.audioPlayer?.state?.resource?.playbackDuration;
         if (typeof playbackDuration === 'number' && Number.isFinite(playbackDuration)) {
-            return this.currentTrackStartOffsetMs + playbackDuration;
+            return this.currentTrackStartOffsetMs + playbackDuration * this.getPlaybackSpeed();
         }
 
         if (!this.startTime) return this.currentTrackStartOffsetMs;
         if (this.paused) {
-            return this.currentTrackStartOffsetMs + this.pausedTime;
+            return this.currentTrackStartOffsetMs + this.pausedTime * this.getPlaybackSpeed();
         }
-        return this.currentTrackStartOffsetMs + (Date.now() - this.startTime) + this.pausedTime;
+        return this.currentTrackStartOffsetMs + ((Date.now() - this.startTime) + this.pausedTime) * this.getPlaybackSpeed();
     }
 
     // Timer-based track completion - no more unreliable Idle events!
@@ -1509,7 +1536,7 @@ class MusicPlayer {
             }
 
             const finishedTrack = this.currentTrack;
-            const playbackMs = this.resource?.playbackDuration || 0;
+            const playbackMs = (this.resource?.playbackDuration || 0) * this.getPlaybackSpeed();
             const totalPlaybackMs = this.currentTrackStartOffsetMs + playbackMs;
             this.lastPlaybackPosition = totalPlaybackMs;
             const durationMs = finishedTrack && Number(finishedTrack.duration) > 0 ? Number(finishedTrack.duration) * 1000 : 0;
@@ -1600,15 +1627,17 @@ class MusicPlayer {
                 await PlayerStateManager.removeState(this.guild.id);
             }
 
-            setTimeout(() => {
+            clearTimeout(this.queueEndTimer);
+            this.queueEndTimer = setTimeout(() => {
+                this.queueEndTimer = null;
                 if (this.queue.length === 0 && !this.currentTrack) {
                     this.cleanup();
                     const clientInstance = this.guild?.client;
-                    if (clientInstance?.players) {
+                    if (clientInstance?.players?.get(this.guild.id) === this) {
                         clientInstance.players.delete(this.guild.id);
                     }
                 }
-            }, 10000);
+            }, config.bot.queueEndTimeout * 1000);
         } finally {
             this.isTransitioning = false;
             this.skipRequested = false;
@@ -1621,91 +1650,121 @@ class MusicPlayer {
         if (!this.autoplay || typeof this.autoplay !== 'string') return;
 
         try {
-            // Genre-specific search keywords
-            const genreKeywords = {
-                pop: ['pop music 2024', 'top pop songs', 'pop hits official', 'best pop music'],
-                rock: ['rock music official', 'rock songs 2024', 'classic rock hits', 'best rock music'],
-                hiphop: ['hip hop music', 'rap songs official', 'hip hop 2024', 'best rap music'],
-                electronic: ['edm music', 'electronic dance music', 'house music official', 'best edm'],
-                jazz: ['jazz music', 'jazz standards', 'smooth jazz official', 'best jazz'],
-                classical: ['classical music', 'classical piano', 'orchestra music', 'best classical'],
-                metal: ['metal music official', 'heavy metal songs', 'metal 2024', 'best metal'],
-                country: ['country music official', 'country songs 2024', 'best country music'],
-                rnb: ['r&b music official', 'rnb songs 2024', 'soul music', 'best rnb'],
-                indie: ['indie music official', 'indie songs 2024', 'alternative music', 'best indie'],
-                latin: ['latin music official', 'reggaeton 2024', 'latin hits', 'best latin music'],
-                kpop: ['kpop official mv', 'kpop songs 2024', 'korean music official', 'best kpop'],
-                anime: ['anime opening official', 'anime songs official', 'anime music 2024', 'best anime op'],
-                lofi: ['lofi hip hop music', 'lofi beats official', 'chill lofi music', 'best lofi'],
-                blues: ['blues music official', 'blues songs', 'blues guitar music', 'best blues'],
-                reggae: ['reggae music official', 'reggae songs 2024', 'best reggae music'],
-                disco: ['disco music official', 'disco hits', 'best disco music'],
-                punk: ['punk rock official', 'punk music 2024', 'pop punk songs', 'best punk'],
-                ambient: ['ambient music official', 'ambient soundscape', 'atmospheric music', 'best ambient'],
-                random: ['music official video', 'top songs 2024', 'music video official', 'best music']
-            };
+            let randomTrack = null;
+            const recent = this.previousTracks.slice(-50);
 
-            const keywords = genreKeywords[this.autoplay] || genreKeywords.random;
-            const randomKeyword = keywords[Math.floor(Math.random() * keywords.length)];
-
-            // Search YouTube for random track
-            const YouTube = require('../providers/YouTube');
-            const results = await YouTube.search(randomKeyword, 15, this.guild.id);
-
-            if (!results || results.length === 0) {
-                return;
+            if (this.autoplay === 'similar' && recent.length > 0) {
+                try {
+                    const seed = recent[recent.length - 1 - Math.floor(Math.random() * Math.min(5, recent.length))];
+                    const candidates = (await Deezer.getArtistRadio(normalizeTitle(seed.title), seed.artist))
+                        .filter(track => !recent.some(played => isExactTrackMatch(track, played) || isExactQueryMatch(normalizeTitle(played.title), track)));
+                    randomTrack = candidates[Math.floor(Math.random() * candidates.length)] || null;
+                    if (randomTrack && (config.bot.defaultSource === 'tidal' || seed.preferredSource === 'tidal')) {
+                        randomTrack.preferredSource = 'tidal';
+                    }
+                } catch (error) {
+                    console.error('❌ Similar autoplay failed:', error.message);
+                }
             }
 
-            // Filter out non-music content
-            const filteredResults = results.filter(track => {
-                // Skip if duration is missing
-                if (!track.duration) return false;
+            if (!randomTrack) {
+                // Genre-specific search keywords
+                const genreKeywords = {
+                    pop: ['pop music 2024', 'top pop songs', 'pop hits official', 'best pop music'],
+                    rock: ['rock music official', 'rock songs 2024', 'classic rock hits', 'best rock music'],
+                    hiphop: ['hip hop music', 'rap songs official', 'hip hop 2024', 'best rap music'],
+                    electronic: ['edm music', 'electronic dance music', 'house music official', 'best edm'],
+                    jazz: ['jazz music', 'jazz standards', 'smooth jazz official', 'best jazz'],
+                    classical: ['classical music', 'classical piano', 'orchestra music', 'best classical'],
+                    metal: ['metal music official', 'heavy metal songs', 'metal 2024', 'best metal'],
+                    country: ['country music official', 'country songs 2024', 'best country music'],
+                    rnb: ['r&b music official', 'rnb songs 2024', 'soul music', 'best rnb'],
+                    indie: ['indie music official', 'indie songs 2024', 'alternative music', 'best indie'],
+                    latin: ['latin music official', 'reggaeton 2024', 'latin hits', 'best latin music'],
+                    kpop: ['kpop official mv', 'kpop songs 2024', 'korean music official', 'best kpop'],
+                    anime: ['anime opening official', 'anime songs official', 'anime music 2024', 'best anime op'],
+                    lofi: ['lofi hip hop music', 'lofi beats official', 'chill lofi music', 'best lofi'],
+                    blues: ['blues music official', 'blues songs', 'blues guitar music', 'best blues'],
+                    reggae: ['reggae music official', 'reggae songs 2024', 'best reggae music'],
+                    disco: ['disco music official', 'disco hits', 'best disco music'],
+                    punk: ['punk rock official', 'punk music 2024', 'pop punk songs', 'best punk'],
+                    ambient: ['ambient music official', 'ambient soundscape', 'atmospheric music', 'best ambient'],
+                    random: ['music official video', 'top songs 2024', 'music video official', 'best music']
+                };
 
-                // Duration limits: 30 seconds to 10 minutes (600 seconds)
-                // This filters out most tutorials, lessons, podcasts, and full movies
-                if (track.duration < 30 || track.duration > 600) return false;
+                const keywords = genreKeywords[this.autoplay] || genreKeywords.random;
+                const randomKeyword = keywords[Math.floor(Math.random() * keywords.length)];
 
-                // Filter out common non-music keywords in title
-                const title = (track.title || '').toLowerCase();
-                const blockedKeywords = [
-                    'tutorial', 'lesson', 'course', 'learn', 'learning',
-                    'podcast', 'interview', 'talk', 'speech', 'lecture',
-                    'review', 'unboxing', 'reaction', 'gameplay',
-                    'full movie', 'full album', 'full episode', 'documentary',
-                    'how to', 'guide', 'tips', 'tricks', 'vlog',
-                    'practice', 'exercise', 'workout', 'meditation',
-                    'asmr', 'story', 'audiobook', 'mix |', 'compilation'
-                ];
+                // Search YouTube for random track
+                const YouTube = require('../providers/YouTube');
+                const results = await YouTube.search(randomKeyword, 15, this.guild.id);
 
-                // Check if title contains any blocked keywords
-                const hasBlockedKeyword = blockedKeywords.some(keyword => title.includes(keyword));
-                if (hasBlockedKeyword) return false;
-
-                // Filter out playlist-like content (mixes and compilations often have many emojis or brackets)
-                const emojiCount = (title.match(/[\u{1F300}-\u{1F9FF}]/gu) || []).length;
-                const bracketCount = (title.match(/[\[\]【】]/g) || []).length;
-                if (emojiCount > 3 || bracketCount > 4) return false;
-
-                return true;
-            });
-
-            if (filteredResults.length === 0) {
-                // Try again with a different keyword
-                const fallbackKeyword = keywords[Math.floor(Math.random() * keywords.length)];
-                const fallbackResults = await YouTube.search(fallbackKeyword, 10, this.guild.id);
-                const fallbackFiltered = (fallbackResults || []).filter(track =>
-                    track.duration >= 30 && track.duration <= 600
-                );
-
-                if (fallbackFiltered.length === 0) {
+                if (!results || results.length === 0) {
                     return;
                 }
 
-                filteredResults.push(...fallbackFiltered);
+                // Filter out non-music content
+                const filteredResults = results.filter(track => {
+                    // Skip if duration is missing
+                    if (!track.duration) return false;
+
+                    // Duration limits: 30 seconds to 10 minutes (600 seconds)
+                    // This filters out most tutorials, lessons, podcasts, and full movies
+                    if (track.duration < 30 || track.duration > 600) return false;
+
+                    // Filter out common non-music keywords in title
+                    const title = (track.title || '').toLowerCase();
+                    const blockedKeywords = [
+                        'tutorial', 'lesson', 'course', 'learn', 'learning',
+                        'podcast', 'interview', 'talk', 'speech', 'lecture',
+                        'review', 'unboxing', 'reaction', 'gameplay',
+                        'full movie', 'full album', 'full episode', 'documentary',
+                        'how to', 'guide', 'tips', 'tricks', 'vlog',
+                        'practice', 'exercise', 'workout', 'meditation',
+                        'asmr', 'story', 'audiobook', 'mix |', 'compilation'
+                    ];
+
+                    // Check if title contains any blocked keywords
+                    const hasBlockedKeyword = blockedKeywords.some(keyword => title.includes(keyword));
+                    if (hasBlockedKeyword) return false;
+
+                    // Filter out playlist-like content (mixes and compilations often have many emojis or brackets)
+                    const emojiCount = (title.match(/[\u{1F300}-\u{1F9FF}]/gu) || []).length;
+                    const bracketCount = (title.match(/[\[\]【】]/g) || []).length;
+                    if (emojiCount > 3 || bracketCount > 4) return false;
+
+                    return true;
+                });
+
+                if (filteredResults.length === 0) {
+                    // Try again with a different keyword
+                    const fallbackKeyword = keywords[Math.floor(Math.random() * keywords.length)];
+                    const fallbackResults = await YouTube.search(fallbackKeyword, 10, this.guild.id);
+                    const fallbackFiltered = (fallbackResults || []).filter(track =>
+                        track.duration >= 30 && track.duration <= 600
+                    );
+
+                    if (fallbackFiltered.length === 0) {
+                        return;
+                    }
+
+                    filteredResults.push(...fallbackFiltered);
+                }
+
+                // Pick random track from filtered results
+                randomTrack = filteredResults[Math.floor(Math.random() * filteredResults.length)];
+
+                if (config.bot.defaultSource === 'tidal' && Tidal.isConfigured()) {
+                    try {
+                        const query = `${normalizeTitle(randomTrack.title)} ${randomTrack.artist || ''}`.trim();
+                        const match = (await Tidal.search(query, 5)).find(candidate => isExactQueryMatch(query, candidate));
+                        if (match) randomTrack = match;
+                    } catch (error) {
+                        console.error(error.message);
+                    }
+                }
             }
 
-            // Pick random track from filtered results
-            const randomTrack = filteredResults[Math.floor(Math.random() * filteredResults.length)];
             randomTrack.requestedBy = this.guild.members.me.user;
             randomTrack.addedAt = Date.now();
 
@@ -1983,6 +2042,7 @@ class MusicPlayer {
             loop: this.loop,
             shuffle: this.shuffle,
             autoplay: this.autoplay,
+            filter: this.currentFilter,
             paused: this.paused,
             pauseReasons: Array.from(this.pauseReasons || []),
             playbackPositionMs: this.getCurrentTime() || 0,
@@ -2011,6 +2071,7 @@ class MusicPlayer {
         this.loop = state.loop ?? false;
         this.shuffle = state.shuffle ?? false;
         this.autoplay = state.autoplay ?? false;
+        this.currentFilter = config.audio.filters[state.filter] ? state.filter : null;
         this.requesterId = state.requesterId || this.requesterId;
 
         this.previousTracks = (state.previousTracks || [])
@@ -2235,6 +2296,8 @@ class MusicPlayer {
 
     cleanup(isShutdown = false) {
         try {
+            clearTimeout(this.queueEndTimer);
+            this.queueEndTimer = null;
             this.clearInactivityTimer(false);
             this.stopStateSync();
 

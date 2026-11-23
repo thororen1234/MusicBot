@@ -255,6 +255,11 @@ setTimeout(() => {
 
     // Handle interactions (slash commands)
     client.on(Events.InteractionCreate, async interaction => {
+        if (interaction.isAutocomplete()) {
+            await Promise.resolve(client.commands.get(interaction.commandName)?.autocomplete?.(interaction, client))
+                .catch(error => console.error(chalk.red(`❌ Autocomplete failed for ${interaction.commandName}:`), error));
+            return;
+        }
         if (!interaction.isChatInputCommand()) return;
 
         const command = client.commands.get(interaction.commandName);

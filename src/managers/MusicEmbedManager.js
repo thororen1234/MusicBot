@@ -417,6 +417,13 @@ class MusicEmbedManager {
             .setEmoji(player.paused ? '▶️' : '⏸️')
             .setDisabled(disabled);
 
+        const previousButton = new ButtonBuilder()
+            .setCustomId(`music_previous:${requesterId}:${sessionId}`)
+            .setLabel(await LanguageManager.getTranslation(guildId, 'buttons.previous'))
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('⏮️')
+            .setDisabled(disabled || player.previousTracks.length === 0);
+
         const skipButton = new ButtonBuilder()
             .setCustomId(`music_skip:${requesterId}:${sessionId}`)
             .setLabel(skipLabel)
@@ -505,10 +512,10 @@ class MusicEmbedManager {
             .setDisabled(disabled || !player.hasLyrics());
 
         const row = new ActionRowBuilder()
-            .addComponents(pauseButton, skipButton, stopButton, queueButton, shuffleButton);
+            .addComponents(previousButton, pauseButton, skipButton, stopButton, queueButton);
 
         const row2 = new ActionRowBuilder()
-            .addComponents(volumeButton, loopButton, autoplayButton, lyricsButton);
+            .addComponents(shuffleButton, volumeButton, loopButton, autoplayButton, lyricsButton);
 
         return [row, row2];
     }

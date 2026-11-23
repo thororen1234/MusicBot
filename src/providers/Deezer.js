@@ -53,6 +53,22 @@ class Deezer {
         }
     }
 
+    static async getArtistRadio(title, artist, limit = 25) {
+        let artistId = null;
+        // YouTube channel names ("ArtistVEVO", "Artist - Topic") make Deezer's search return nothing
+        for (const q of [`${title} ${artist || ''}`.trim(), title]) {
+            const { data: found } = await axios.get('https://api.deezer.com/search', { params: { q, limit: 1 }, timeout: 10000 });
+            artistId = found?.data?.[0]?.artist?.id;
+            if (artistId) break;
+        }
+        if (!artistId) return [];
+
+        const { data } = await axios.get(`https://api.deezer.com/artist/${artistId}/radio`, { params: { limit }, timeout: 10000 });
+        return (data?.data || [])
+            .filter(item => item.readable !== false)
+            .map(item => this.formatTrack(item, item.album));
+    }
+
     static formatTrack(item, album) {
         const title = item.title || 'Unknown Title';
         const artist = item.artist?.name || 'Unknown Artist';

@@ -5,6 +5,7 @@ const modalHandler = require('../events/modalHandler');
 const { getControllablePlayer } = require('../utils/PlayerCommand');
 
 const GENRES = [
+    { name: 'Similar Songs', value: 'similar' },
     { name: 'Pop', value: 'pop' },
     { name: 'Rock', value: 'rock' },
     { name: 'Hip-Hop', value: 'hiphop' },

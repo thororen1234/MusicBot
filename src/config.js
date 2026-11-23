@@ -96,6 +96,8 @@ module.exports = {
         defaultSource: ['tidal', 'soundcloud'].includes((process.env.DEFAULT_SOURCE || '').trim().toLowerCase())
             ? process.env.DEFAULT_SOURCE.trim().toLowerCase()
             : 'youtube',
+        djRoleId: process.env.DJ_ROLE_ID || null,
+        queueEndTimeout: Number.parseInt(process.env.QUEUE_END_TIMEOUT, 10) >= 0 ? Number.parseInt(process.env.QUEUE_END_TIMEOUT, 10) : 120,
         supportServer: process.env.SUPPORT_SERVER || 'https://discord.gg/ACJQzJuckW',
         website: process.env.WEBSITE || 'https://beatra.app',
         invite: 'https://discord.com/oauth2/authorize?client_id=' + process.env.CLIENT_ID + '&permissions=8&scope=bot%20applications.commands',
@@ -107,10 +109,10 @@ module.exports = {
         format: 'mp3',
         bitrate: 320,
         filters: {
-            bassboost: 'bass=g=20',
-            nightcore: 'aresample=48000,asetrate=48000*1.25',
-            vaporwave: 'aresample=48000,asetrate=48000*0.8',
-            _8d: 'apulsator=hz=0.09',
+            bassboost: { af: 'bass=g=20' },
+            nightcore: { af: 'aresample=48000,asetrate=48000*1.25', speed: 1.25 },
+            vaporwave: { af: 'aresample=48000,asetrate=48000*0.8', speed: 0.8 },
+            '8d': { af: 'apulsator=hz=0.09' },
         }
     },
 

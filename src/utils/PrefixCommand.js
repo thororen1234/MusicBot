@@ -45,7 +45,15 @@ function parseValue(option, raw) {
  * first unset string/number option, so `!!play never gonna give you up` sets `query`.
  */
 function parseOptions(command, argsText, message) {
-    const definitions = command.data.toJSON().options || [];
+    let definitions = command.data.toJSON().options || [];
+    let subcommand = null;
+    if (definitions.some(option => option.type === ApplicationCommandOptionType.Subcommand)) {
+        const [name = ''] = argsText.split(/\s+/, 1);
+        subcommand = definitions.find(option => option.name === name.toLowerCase());
+        if (!subcommand) throw new Error(`Use \`${command.data.name} <${definitions.map(option => option.name).join('|')}>\`.`);
+        definitions = subcommand.options || [];
+        argsText = argsText.slice(name.length).trim();
+    }
     const values = new Map();
     let rest = argsText;
 
@@ -99,6 +107,7 @@ function parseOptions(command, argsText, message) {
         getNumber: get,
         getBoolean: get,
         getAttachment: get,
+        getSubcommand: () => subcommand?.name ?? null,
     };
 }
 

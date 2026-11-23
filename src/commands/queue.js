@@ -63,7 +63,7 @@ module.exports = {
             const pausedIcon = player.paused ? '⏸️ ' : '';
 
             lines.push(`**${nowPlayingLabel}**`);
-            lines.push(`${pausedIcon}[${this.truncate(track.title)}](${track.url}) \`${position} / ${this.formatDuration(track.duration)}\``);
+            lines.push(`${pausedIcon}${player.getPlatformEmoji(player.playsViaYouTube(track) ? 'youtube' : track.platform)} [${this.truncate(track.title)}](${track.url}) \`${position} / ${this.formatDuration(track.duration)}\``);
             lines.push('');
         }
 
@@ -76,7 +76,7 @@ module.exports = {
             const start = page * PAGE_SIZE;
             queue.slice(start, start + PAGE_SIZE).forEach((track, index) => {
                 const requester = track.requestedBy ? ` • <@${track.requestedBy.id}>` : '';
-                lines.push(`\`${start + index + 1}.\` [${this.truncate(track.title)}](${track.url}) \`${this.formatDuration(track.duration)}\`${requester}`);
+                lines.push(`\`${start + index + 1}.\` ${player.getPlatformEmoji(player.playsViaYouTube(track) ? 'youtube' : track.platform)} [${this.truncate(track.title)}](${track.url}) \`${this.formatDuration(track.duration)}\`${requester}`);
             });
         }
 

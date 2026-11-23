@@ -64,12 +64,10 @@ class LyricsManager {
             .trim();
     }
 
-    /**
-     * Build simple lyrics data object (no sync support)
-     */
     buildLyricsData(track, data = {}) {
         return {
             plain: data.plain ?? null,
+            synced: data.synced ?? null,
             source: data.source ?? null,
             artist: data.artist ?? track?.artist ?? track?.uploader ?? null,
             title: data.title ?? track?.title ?? null,
@@ -123,11 +121,28 @@ class LyricsManager {
 
 
 
+    parseLrc(lrc = '') {
+        const synced = [];
+        const plain = lrc
+            .split('\n')
+            .map(line => {
+                const stamps = line.match(/^(\[\d+:\d+(?:[.:]\d+)?\])+/)?.[0] || '';
+                const text = line.slice(stamps.length).trim();
+                for (const [, min, sec, frac = ''] of stamps.matchAll(/\[(\d+):(\d+)(?:[.:](\d+))?\]/g)) {
+                    synced.push({ timeMs: (Number(min) * 60 + Number(sec)) * 1000 + Math.round(Number(`0.${frac}`) * 1000), text });
+                }
+                return text;
+            })
+            .join('\n')
+            .trim();
+        return { plain: plain || null, synced: synced.length ? synced.sort((a, b) => a.timeMs - b.timeMs) : null };
+    }
+
     async fetchFromTidal(track) {
         if (!Tidal.isConfigured() || !track.id) return null;
         try {
-            const plain = await Tidal.getLyrics(track.id);
-            return plain ? this.buildLyricsData(track, { plain, source: 'Tidal' }) : null;
+            const lyrics = this.parseLrc(await Tidal.getLyrics(track.id) || '');
+            return lyrics.plain ? this.buildLyricsData(track, { ...lyrics, source: 'Tidal' }) : null;
         } catch (error) {
             console.error('❌ Failed to fetch lyrics from Tidal:', error.message);
             return null;
@@ -161,11 +176,11 @@ class LyricsManager {
 
                     if (response.data && response.data.length > 0) {
                         const result = response.data[0];
-                        // Only use plain lyrics from LRCLIB
                         if (!result.plainLyrics) continue;
 
                         return this.buildLyricsData(track, {
                             plain: result.plainLyrics,
+                            synced: this.parseLrc(result.syncedLyrics || '').synced,
                             source: 'LRCLIB'
                         });
                     }
@@ -248,14 +263,16 @@ class LyricsManager {
      * @param {number} maxLength - Max character length per page
      * @returns {Array<string>} Array of lyric pages
      */
-    formatFullLyrics(lyricsData, maxLength = 4000) {
+    formatFullLyrics(lyricsData, maxLength = 4000, currentLine = null) {
         if (!lyricsData) return [];
 
-        const text = lyricsData.plain || lyricsData.synced?.replace(/\[\d+:\d+\.\d+\]/g, '') || '';
+        const text = lyricsData.plain || '';
         if (!text) return [];
 
         const pages = [];
-        const lines = text.split('\n').filter(line => line.trim());
+        const lines = currentLine
+            ? lyricsData.synced.filter(line => line.text.trim()).map(line => line === currentLine ? `**${line.text}**` : line.text)
+            : text.split('\n').filter(line => line.trim());
 
         let currentPage = '';
         for (const line of lines) {

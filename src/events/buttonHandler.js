@@ -77,6 +77,10 @@ module.exports = {
                     await this.handlePause(interaction, player, requesterId);
                     break;
 
+                case 'music_previous':
+                    await this.handlePrevious(interaction, player, requesterId);
+                    break;
+
                 case 'music_skip':
                     await this.handleSkip(interaction, player, requesterId);
                     break;
@@ -138,7 +142,9 @@ module.exports = {
         if (member?.permissions?.has('ManageGuild')) return true;
 
         // DJ role check (if exists)
-        if (member?.roles?.cache?.some(role => role.name.toLowerCase().includes('dj'))) return true;
+        if (config.bot.djRoleId
+            ? member?.roles?.cache?.has(config.bot.djRoleId)
+            : member?.roles?.cache?.some(role => role.name.toLowerCase().includes('dj'))) return true;
 
         // Music starter check
         if (userId && requesterId && String(userId) === String(requesterId)) return true;
@@ -280,7 +286,14 @@ module.exports = {
         }
     },
 
-    async handlePrevious(interaction, player) {
+    async handlePrevious(interaction, player, requesterId) {
+        if (!this.isAuthorized(interaction, requesterId)) {
+            return await interaction.reply({
+                content: await LanguageManager.getTranslation(interaction.guild?.id, 'buttonhandler.not_authorized'),
+                flags: [1 << 6]
+            });
+        }
+
         if (player.previousTracks.length === 0) {
             return await interaction.reply({
                 content: await LanguageManager.getTranslation(interaction.guild?.id, 'buttonhandler.no_previous_song'),
@@ -288,18 +301,15 @@ module.exports = {
             });
         }
 
-        const result = player.previous();
+        await interaction.deferReply({ flags: [1 << 6] });
+        const result = await player.previous();
 
-        if (result) {
-            await interaction.reply({
-                content: await LanguageManager.getTranslation(interaction.guild?.id, 'buttonhandler.moved_to_previous'),
-                flags: [1 << 6]
-            });
-        } else {
-            await interaction.reply({
-                content: await LanguageManager.getTranslation(interaction.guild?.id, 'buttonhandler.previous_failed'),
-                flags: [1 << 6]
-            });
+        await interaction.editReply({
+            content: await LanguageManager.getTranslation(interaction.guild?.id, result ? 'buttonhandler.moved_to_previous' : 'buttonhandler.previous_failed')
+        });
+
+        if (result && interaction.client.musicEmbedManager) {
+            await interaction.client.musicEmbedManager.updateNowPlayingEmbed(player);
         }
     },
 
@@ -542,6 +552,10 @@ module.exports = {
             .setCustomId(`autoplay_genre:${requesterId}:${player.sessionId}`)
             .setPlaceholder(await LanguageManager.getTranslation(interaction.guild?.id, 'buttonhandler.autoplay_select_genre'))
             .addOptions(
+                new StringSelectMenuOptionBuilder()
+                    .setLabel(await LanguageManager.getTranslation(interaction.guild?.id, 'genres.similar'))
+                    .setValue('similar')
+                    .setEmoji('🔁'),
                 new StringSelectMenuOptionBuilder()
                     .setLabel(await LanguageManager.getTranslation(interaction.guild?.id, 'genres.pop'))
                     .setValue('pop')
@@ -967,7 +981,8 @@ module.exports = {
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
             const lyricsData = player.currentLyrics;
-            const pages = LyricsManager.formatFullLyrics(lyricsData, 4000);
+            const currentLine = lyricsData.synced?.findLast(line => line.timeMs <= player.getCurrentTime() && line.text.trim());
+            const pages = LyricsManager.formatFullLyrics(lyricsData, 4000, currentLine);
 
             if (pages.length === 0) {
                 return await interaction.editReply({
@@ -990,7 +1005,7 @@ module.exports = {
             }
 
             // Multiple pages - send with pagination buttons
-            let currentPage = 0;
+            let currentPage = currentLine ? Math.max(pages.findIndex(page => page.split('\n').includes(`**${currentLine.text}**`)), 0) : 0;
 
             const createLyricsEmbed = (pageIndex) => {
                 return new EmbedBuilder()
