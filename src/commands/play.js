@@ -203,9 +203,9 @@ module.exports = {
 
                 case 'search':
                     if (source === 'tidal') {
-                        // Only play from Tidal when it has an exact match, otherwise search YouTube
+                        // Prefer an exact Tidal match, then the top Tidal result, and only search YouTube when Tidal has nothing
                         try {
-                            const match = await Tidal.findExact(query);
+                            const match = await Tidal.findBest(query);
                             if (match) tracks = [match];
                         } catch (error) {
                             console.error(error.message);

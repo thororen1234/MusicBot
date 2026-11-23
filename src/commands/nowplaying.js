@@ -39,7 +39,7 @@ module.exports = {
             const artistLabel = await LanguageManager.getTranslation(guildId, 'commands.nowplaying.artist');
             const albumLabel = await LanguageManager.getTranslation(guildId, 'commands.nowplaying.album');
             const platformLabel = await LanguageManager.getTranslation(guildId, 'commands.nowplaying.platform');
-            const platformCode = (track.platform || 'unknown').toString().toLowerCase();
+            const platformCode = ((player.playsViaYouTube(track) ? 'youtube' : track.platform) || 'unknown').toString().toLowerCase();
             const platformNameKey = `commands.nowplaying.platform_name_${platformCode}`;
             let platformName = await LanguageManager.getTranslation(guildId, platformNameKey);
 

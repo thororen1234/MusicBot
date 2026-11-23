@@ -112,10 +112,10 @@ class Tidal {
         return (data.searchResult3?.song || []).slice(0, limit).map(song => this.formatTrack(song));
     }
 
-    // First of the top results that exactly matches the query, or null
-    static async findExact(query) {
+    // First of the top results that exactly matches the query, else the top result, or null
+    static async findBest(query) {
         const results = await this.search(query, 5);
-        return results.find(track => isExactQueryMatch(query, track)) || null;
+        return results.find(track => isExactQueryMatch(query, track)) || results[0] || null;
     }
 
     // Plain-text lyrics for a Tidal track ID, or null. Synced (LRC) lyrics have their timestamps stripped.

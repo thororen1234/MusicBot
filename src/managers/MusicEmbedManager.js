@@ -244,12 +244,13 @@ class MusicEmbedManager {
         }
 
         // Platform
-        if (track.platform) {
+        const platform = player.playsViaYouTube(track) ? 'youtube' : track.platform;
+        if (platform) {
             const platformLabel = await LanguageManager.getTranslation(guildId, 'commands.play.platform');
             embed.addFields({
                 name: platformLabel,
-                value: this.getPlatformEmoji(track.platform) + ' ' +
-                    track.platform.charAt(0).toUpperCase() + track.platform.slice(1),
+                value: this.getPlatformEmoji(platform) + ' ' +
+                    platform.charAt(0).toUpperCase() + platform.slice(1),
                 inline: true
             });
         }
