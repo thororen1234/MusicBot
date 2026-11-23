@@ -35,7 +35,7 @@
         "`/move <from> <to>` - Move a song in the queue",
         "`/clear` - Clear the queue",
         "`/filter <name>` - Apply an audio filter (Bass Boost, Nightcore, Vaporwave, 8D)",
-        "`/playlist <save|load|list|delete>` - Save the queue as a playlist and load it later",
+        "`/playlist <save|import|load|list|delete>` - Save the queue or import a Spotify, Apple Music, Deezer, Tidal or YouTube playlist, and load it later",
         "`/volume [level]` - Set the volume (0-100)",
         "`/loop [mode]` - Set the loop mode (Off/Track/Queue)",
         "`/autoplay [genre]` - Toggle autoplay with similar songs or a genre",
